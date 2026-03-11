@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - AULA</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #0369a1 0%, #7c3aed 100%);
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    .offline-content {
+      max-width: 400px;
+    }
+    .icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 12px;
+    }
+    p {
+      font-size: 16px;
+      opacity: 0.9;
+      line-height: 1.6;
+    }
+    button {
+      margin-top: 24px;
+      padding: 12px 24px;
+      background: white;
+      color: #0369a1;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-content">
+    <div class="icon">📡</div>
+    <h1>Você está offline</h1>
+    <p>Não foi possível conectar ao servidor. Verifique sua conexão com a internet e tente novamente.</p>
+    <button onclick="location.reload()">Tentar Novamente</button>
+  </div>
+</body>
+</html>

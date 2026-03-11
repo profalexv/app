@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assinatura - AULA</title>
+  <link rel="stylesheet" href="../../styles/app.css">
+  <link rel="stylesheet" href="subscription.css">
+</head>
+<body>
+  <div class="container">
+    <header class="page-header">
+      <h1>🔑 Gerenciamento de Assinatura</h1>
+      <button id="btn-back" class="btn-secondary">← Voltar</button>
+    </header>
+
+    <!-- Loading state -->
+    <div id="loading-section" class="loading-section">
+      <p>Carregando informações da assinatura...</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error-section" class="error-section" style="display: none;">
+      <p id="error-message" class="error-text"></p>
+      <button id="btn-retry" class="btn-primary">Tentar Novamente</button>
+    </div>
+
+    <!-- Main content -->
+    <div id="content-section" style="display: none;">
+      
+      <!-- Current Plan Info -->
+      <section class="card plan-card">
+        <h2>Seu Plano Atual</h2>
+        <div class="plan-info">
+          <div class="plan-badge" id="plan-badge">
+            <span id="plan-name">Carregando...</span>
+          </div>
+          <p id="plan-description" class="plan-description"></p>
+          
+          <div class="plan-status" id="plan-status">
+            <!-- Status info will be inserted here -->
+          </div>
+
+          <div class="plan-pricing" id="plan-pricing">
+            <!-- Pricing info will be inserted here -->
+          </div>
+        </div>
+
+        <button id="btn-upgrade" class="btn-primary" style="display: none;">
+          📈 Fazer Upgrade
+        </button>
+      </section>
+
+      <!-- Usage Statistics -->
+      <section class="card usage-card">
+        <h2>Uso Atual</h2>
+        <div class="usage-stats">
+          
+          <!-- Classes Usage -->
+          <div class="usage-item">
+            <div class="usage-header">
+              <span class="usage-label">🏫 Turmas</span>
+              <span class="usage-count" id="usage-classes-text">0/0</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="usage-classes-bar" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Teachers Usage -->
+          <div class="usage-item">
+            <div class="usage-header">
+              <span class="usage-label">👨‍🏫 Professores</span>
+              <span class="usage-count" id="usage-teachers-text">0/0</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="usage-teachers-bar" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Resources Usage -->
+          <div class="usage-item">
+            <div class="usage-header">
+              <span class="usage-label">🏢 Recursos</span>
+              <span class="usage-count" id="usage-resources-text">0/0</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="usage-resources-bar" style="width: 0%"></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Available Features -->
+      <section class="card features-card">
+        <h2>Recursos Disponíveis</h2>
+        <div id="features-list" class="features-list">
+          <!-- Features will be inserted here -->
+        </div>
+      </section>
+
+      <!-- Available Plans (for upgrade) -->
+      <section class="card plans-card" id="plans-section" style="display: none;">
+        <h2>Planos Disponíveis</h2>
+        <div id="plans-list" class="plans-grid">
+          <!-- Plans will be inserted here -->
+        </div>
+      </section>
+
+    </div>
+
+  </div>
+
+  <!-- Upgrade Modal -->
+  <div id="upgrade-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Fazer Upgrade de Plano</h2>
+      <div id="upgrade-plan-info">
+        <!-- Selected plan info -->
+      </div>
+      <div class="modal-actions">
+        <button id="btn-confirm-upgrade" class="btn-primary">Confirmar Upgrade</button>
+        <button id="btn-cancel-upgrade" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="subscription.js"></script>
+</body>
+</html>

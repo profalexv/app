@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aula - Plataforma Escolar</title>
+  <script>
+    // Quando acessado via servidor local (HTTP/HTTPS), redireciona para o sistema.
+    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+      window.location.replace('/src/renderer/index.html');
+    }
+  </script>
+  <style>
+    body { margin: 0; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #f0f4f8; color: #333; }
+    p { font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+  <p>📚 Aula — <a href="src/renderer/index.html">Abrir sistema</a></p>
+</body>
+</html>
+curl https://aula-motor.fly.dev/api/subscriptions/plans
+# deve retornar a lista com os 8 planos

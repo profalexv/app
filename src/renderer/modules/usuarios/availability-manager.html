@@ -1,0 +1,653 @@
+<!--
+Gerenciador de Disponibilidade com Drag-and-Drop
+Para módulo de Usuários no sistema principal
+-->
+<div id="availability-manager" class="modal-like">
+  <div class="modal-content availability-modal">
+    <div class="modal-header">
+      <h3>⏰ Gerenciar Disponibilidade</h3>
+      <p class="subtitle">Marque os horários que você está disponível</p>
+      <button class="modal-close" onclick="closeAvailabilityManager()">&times;</button>
+    </div>
+
+    <div class="modal-body availability-body">
+      <!-- Aba de Seleção -->
+      <div class="availability-tabs">
+        <button class="tab-btn active" data-tab="grid">Seletor Visual</button>
+        <button class="tab-btn" data-tab="list">Lista Rápida</button>
+      </div>
+
+      <!-- Grid Visual -->
+      <div id="availability-grid" class="availability-tab active">
+        <div class="grid-header">
+          <p class="instructions">
+            Clique ou arraste para marcar sua disponibilidade.<br>
+            <strong>Verde</strong> = Disponível | <strong>Cinza</strong> = Indisponível
+          </p>
+        </div>
+
+        <div class="availability-grid-container">
+          <div class="time-column">
+            <div class="period-header">Período</div>
+            <div id="periods-list" class="periods-list"></div>
+          </div>
+
+          <div class="weekdays-container">
+            <div class="weekdays-header" id="weekdays-header"></div>
+            <div class="grid-content" id="availability-cells"></div>
+          </div>
+        </div>
+
+        <div class="grid-controls">
+          <button class="btn-secondary" id="btn-select-all">✓ Marcar Tudo</button>
+          <button class="btn-secondary" id="btn-clear-all">✗ Desmarcar Tudo</button>
+          <button class="btn-secondary" id="btn-weekdays-only">📅 Apenas Weekdays</button>
+        </div>
+      </div>
+
+      <!-- Lista Rápida -->
+      <div id="availability-list" class="availability-tab">
+        <div class="quick-selection">
+          <p class="instructions">Selecione períodos pré-configurados para sua disponibilidade:</p>
+
+          <div class="preset-buttons">
+            <button class="preset-btn" data-preset="full">
+              <strong>Horário Integral</strong><br>
+              <small>Seg-Sex, todos os períodos</small>
+            </button>
+
+            <button class="preset-btn" data-preset="morning">
+              <strong>Período Matinal</strong><br>
+              <small>Seg-Sex, 1º-4º período</small>
+            </button>
+
+            <button class="preset-btn" data-preset="afternoon">
+              <strong>Período Vespertino</strong><br>
+              <small>Seg-Sex, 5º-8º período</small>
+            </button>
+
+            <button class="preset-btn" data-preset="evening">
+              <strong>Período Noturno</strong><br>
+              <small>Seg-Sex, 9º-10º período</small>
+            </button>
+
+            <button class="preset-btn" data-preset="flexible">
+              <strong>Flexível</strong><br>
+              <small>Todos os dias, todos os períodos</small>
+            </button>
+
+            <button class="preset-btn" data-preset="none">
+              <strong>Nenhuma Disponibilidade</strong><br>
+              <small>Deixar em branco</small>
+            </button>
+          </div>
+
+          <div class="custom-list">
+            <h4>Ou configure manualmente:</h4>
+            <textarea id="custom-availability" placeholder="seg:1-4&#10;ter:1-4&#10;qua:1-4&#10;... (dia:período-período)"></textarea>
+            <button class="btn-secondary" id="btn-apply-custom">Aplicar Configuração</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resumo -->
+    <div class="availability-summary">
+      <h4>Resumo da Disponibilidade:</h4>
+      <div id="summary-text" class="summary-text">Nenhuma disponibilidade selecionada</div>
+    </div>
+
+    <!-- Ações -->
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeAvailabilityManager()">Cancelar</button>
+      <button class="btn-primary" id="btn-save-availability">💾 Salvar Disponibilidade</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.modal-like {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-like.active {
+  display: flex;
+}
+
+.availability-modal {
+  max-width: 900px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.availability-body {
+  padding: 20px;
+  min-height: 400px;
+}
+
+/* Tabs */
+.availability-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.availability-tabs .tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.availability-tabs .tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.availability-tab {
+  display: none;
+}
+
+.availability-tab.active {
+  display: block;
+}
+
+/* Grid Visual */
+.grid-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.grid-header .instructions {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.availability-grid-container {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--color-bg-secondary);
+}
+
+.time-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.period-header {
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+  min-width: 60px;
+  padding: 8px;
+  color: var(--color-text-muted);
+}
+
+.periods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.period-item {
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+  min-width: 60px;
+  padding: 8px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+}
+
+.weekdays-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.weekdays-header {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.weekday-header-item {
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+  min-width: 50px;
+  padding: 8px;
+  color: var(--color-text-muted);
+}
+
+.grid-content {
+  display: grid;
+  gap: 10px;
+}
+
+.availability-cell {
+  width: 50px;
+  height: 50px;
+  border: 2px solid var(--color-border);
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.availability-cell:hover {
+  border-color: var(--color-primary);
+  transform: scale(1.05);
+}
+
+.availability-cell.available {
+  background: var(--color-success);
+  color: white;
+  border-color: var(--color-success);
+}
+
+.availability-cell.available::after {
+  content: '✓';
+  font-weight: bold;
+}
+
+/* Controles da Grid */
+.grid-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.grid-controls .btn-secondary {
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
+/* Lista Rápida */
+.quick-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.instructions {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin-top: 0;
+}
+
+.preset-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.preset-btn {
+  padding: 16px;
+  background: white;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+  text-align: center;
+}
+
+.preset-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-secondary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.preset-btn:active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: white;
+}
+
+.preset-btn strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.preset-btn small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.preset-btn:active small {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.custom-list {
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+}
+
+.custom-list h4 {
+  margin-top: 0;
+  font-size: 14px;
+}
+
+.custom-list textarea {
+  width: 100%;
+  height: 100px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 12px;
+  margin-bottom: 10px;
+  resize: vertical;
+}
+
+/* Resumo */
+.availability-summary {
+  padding: 16px;
+  background: var(--color-bg-secondary);
+  border-radius: 8px;
+  border-left: 4px solid var(--color-primary);
+  margin: 20px;
+  margin-bottom: 0;
+}
+
+.availability-summary h4 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.summary-text {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-family: monospace;
+  word-break: break-all;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .availability-modal {
+    max-width: 95vw;
+  }
+
+  .availability-grid-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .preset-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .availability-cell {
+    width: 40px;
+    height: 40px;
+    font-size: 10px;
+  }
+}
+</style>
+
+<script>
+// Constantes
+const WEEKDAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const MAX_PERIODS = 10;
+
+// Estado do gerenciador
+let availabilityState = {
+  selected: new Set(), // "weekday-period" (ex: "1-1", "2-3")
+  presets: {
+    full: () => selectWeekdaysPeriods([1,2,3,4,5], [1,2,3,4,5,6,7,8]),
+    morning: () => selectWeekdaysPeriods([1,2,3,4,5], [1,2,3,4]),
+    afternoon: () => selectWeekdaysPeriods([1,2,3,4,5], [5,6,7,8]),
+    evening: () => selectWeekdaysPeriods([1,2,3,4,5], [9,10]),
+    flexible: () => selectWeekdaysPeriods([1,2,3,4,5,6], [1,2,3,4,5,6,7,8,9,10]),
+    none: () => clearSelection()
+  }
+};
+
+// Renderiza grid visual
+function renderAvailabilityGrid() {
+  const periodsHtml = Array.from({length: MAX_PERIODS}, (_, i) => 
+    `<div class="period-item">${i+1}º</div>`
+  ).join('');
+  document.getElementById('periods-list').innerHTML = periodsHtml;
+
+  const weekdaysHtml = WEEKDAYS.map((day, i) => 
+    `<div class="weekday-header-item" data-weekday="${i+1}" style="grid-column: ${i+1}">${day.slice(0,3)}</div>`
+  ).join('');
+
+  let headerHtml = '<style>.weekdays-header { grid-template-columns: repeat(6, 50px); }</style>';
+  document.getElementById('weekdays-header').innerHTML = headerHtml + weekdaysHtml;
+
+  let cellsHtml = '';
+  for (let weekday = 1; weekday <= 6; weekday++) {
+    for (let period = 1; period <= MAX_PERIODS; period++) {
+      const key = `${weekday}-${period}`;
+      const isSelected = availabilityState.selected.has(key);
+      cellsHtml += `
+        <div class="availability-cell ${isSelected ? 'available' : ''}" 
+             data-key="${key}"
+             onclick="toggleCell('${key}')"
+             draggable="true"
+             ondragstart="dragStart(event)"
+             ondragover="dragOver(event)"
+             ondrop="dragDrop(event)">
+        </div>
+      `;
+    }
+  }
+
+  let gridHtml = '<style>.grid-content { grid-template-columns: repeat(6, 50px); }</style>';
+  document.getElementById('availability-cells').innerHTML = gridHtml + cellsHtml;
+
+  updateSummary();
+}
+
+// Toggle de célula
+function toggleCell(key) {
+  if (availabilityState.selected.has(key)) {
+    availabilityState.selected.delete(key);
+  } else {
+    availabilityState.selected.add(key);
+  }
+  renderAvailabilityGrid();
+}
+
+// Drag and drop
+let draggedCell = null;
+
+function dragStart(e) {
+  draggedCell = e.target;
+  e.target.style.opacity = '0.5';
+}
+
+function dragOver(e) {
+  e.preventDefault();
+  e.target.style.background = 'rgba(3, 105, 161, 0.2)';
+}
+
+function dragDrop(e) {
+  e.preventDefault();
+  if (draggedCell) {
+    const sourceKey = draggedCell.dataset.key;
+    const targetKey = e.target.dataset.key;
+    
+    if (sourceKey && targetKey) {
+      const [sourceWd, sourcePer] = sourceKey.split('-').map(Number);
+      const [targetWd, targetPer] = targetKey.split('-').map(Number);
+      
+      const startWd = Math.min(sourceWd, targetWd);
+      const endWd = Math.max(sourceWd, targetWd);
+      const startPer = Math.min(sourcePer, targetPer);
+      const endPer = Math.max(sourcePer, targetPer);
+      
+      for (let wd = startWd; wd <= endWd; wd++) {
+        for (let per = startPer; per <= endPer; per++) {
+          availabilityState.selected.add(`${wd}-${per}`);
+        }
+      }
+      renderAvailabilityGrid();
+    }
+  }
+  e.target.style.background = '';
+}
+
+// Funções de seleção
+function selectWeekdaysPeriods(weekdays, periods) {
+  availabilityState.selected.clear();
+  weekdays.forEach(wd => {
+    periods.forEach(per => {
+      availabilityState.selected.add(`${wd}-${per}`);
+    });
+  });
+  renderAvailabilityGrid();
+}
+
+function clearSelection() {
+  availabilityState.selected.clear();
+  renderAvailabilityGrid();
+}
+
+// Atualiza resumo
+function updateSummary() {
+  if (availabilityState.selected.size === 0) {
+    document.getElementById('summary-text').textContent = 'Nenhuma disponibilidade selecionada';
+    return;
+  }
+
+  const byWeekday = {};
+  availabilityState.selected.forEach(key => {
+    const [wd, per] = key.split('-');
+    if (!byWeekday[wd]) byWeekday[wd] = [];
+    byWeekday[wd].push(Number(per));
+  });
+
+  let summary = '';
+  Object.keys(byWeekday).sort((a,b) => a-b).forEach(wd => {
+    const periods = byWeekday[wd].sort((a,b) => a-b);
+    summary += `${WEEKDAYS[wd-1]}: ${periods.join(', ')}º período;\n`;
+  });
+
+  document.getElementById('summary-text').textContent = summary;
+}
+
+// Inicialização
+function initAvailabilityManager() {
+  renderAvailabilityGrid();
+
+  // Tabs
+  document.querySelectorAll('.availability-tabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.availability-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.availability-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`availability-${tab}`).classList.add('active');
+      btn.classList.add('active');
+    });
+  });
+
+  // Controles de grid
+  document.getElementById('btn-select-all').addEventListener('click', () => {
+    selectWeekdaysPeriods([1,2,3,4,5,6], Array.from({length: MAX_PERIODS}, (_,i) => i+1));
+  });
+
+  document.getElementById('btn-clear-all').addEventListener('click', clearSelection);
+
+  document.getElementById('btn-weekdays-only').addEventListener('click', () => {
+    selectWeekdaysPeriods([1,2,3,4,5], Array.from({length: MAX_PERIODS}, (_,i) => i+1));
+  });
+
+  // Presets
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const preset = btn.dataset.preset;
+      if (availabilityState.presets[preset]) {
+        availabilityState.presets[preset]();
+      }
+    });
+  });
+
+  // Custom
+  document.getElementById('btn-apply-custom').addEventListener('click', () => {
+    const text = document.getElementById('custom-availability').value;
+    clearSelection();
+    
+    text.split('\n').forEach(line => {
+      const match = line.match(/(\d+)-(\d+(?:,\d+)*)/);
+      if (match) {
+        const wd = parseInt(match[1]);
+        const periods = match[2].split(',').map(Number);
+        periods.forEach(per => {
+          availabilityState.selected.add(`${wd}-${per}`);
+        });
+      }
+    });
+    renderAvailabilityGrid();
+  });
+
+  // Save
+  document.getElementById('btn-save-availability').addEventListener('click', () => {
+    const slots = Array.from(availabilityState.selected).map(key => {
+      const [weekday, period] = key.split('-').map(Number);
+      return { weekday, period };
+    });
+
+    console.log('Salvando disponibilidade:', slots);
+    // TODO: Chamar API para salvar
+    closeAvailabilityManager();
+  });
+}
+
+function openAvailabilityManager() {
+  document.getElementById('availability-manager').classList.add('active');
+  initAvailabilityManager();
+}
+
+function closeAvailabilityManager() {
+  document.getElementById('availability-manager').classList.remove('active');
+}
+
+// Auto-inicializa quando documento carrega
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('availability-manager')) {
+    initAvailabilityManager();
+  }
+});
+</script>

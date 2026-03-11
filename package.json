@@ -1,0 +1,16 @@
+{
+  "name": "aula",
+  "version": "2.0.0",
+  "description": "Aula - Plataforma web de gestão escolar (Browser SPA + Fly.io + Supabase)",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js --dev"
+  },
+  "dependencies": {
+    "express": "^4.22.1",
+    "winston": "^3.19.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}

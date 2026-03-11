@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0369a1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="AULA - App do Professor para gestão de horários e recursos">
+  
+  <title>AULA - App do Professor</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Tela de Login -->
+  <div id="login-screen" class="screen active">
+    <div class="login-container">
+      <div class="logo">
+        <div class="logo-icon">📚</div>
+        <h1>AULA</h1>
+        <p class="subtitle">App do Professor</p>
+      </div>
+      
+      <form id="login-form" class="login-form">
+        <div class="form-group">
+          <label>Servidor</label>
+          <input 
+            type="text" 
+            id="server-url" 
+            placeholder="https://aula.suaescola.com.br"
+            value="http://localhost:3000"
+            required>
+          <small>URL do servidor AULA da sua escola</small>
+        </div>
+        
+        <div class="form-group">
+          <label>Escola</label>
+          <select id="school-select" required>
+            <option value="">Carregando...</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>CPF</label>
+          <input 
+            type="text" 
+            id="cpf" 
+            placeholder="000.000.000-00"
+            maxlength="14"
+            required>
+        </div>
+        
+        <div class="form-group">
+          <label>Senha</label>
+          <input 
+            type="password" 
+            id="password" 
+            placeholder="••••••••"
+            required>
+        </div>
+        
+        <button type="submit" class="btn-primary">Entrar</button>
+        
+        <div id="login-error" class="error-message"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tela Principal -->
+  <div id="main-screen" class="screen">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <h1>AULA</h1>
+        <button id="btn-logout" class="btn-icon">🚪</button>
+      </div>
+      <div class="teacher-info">
+        <span id="teacher-name">Professor</span>
+        <span id="school-name" class="muted"></span>
+      </div>
+    </header>
+
+    <!-- Navegação -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-view="schedule">
+        <span class="icon">📅</span>
+        <span class="label">Meu Horário</span>
+      </button>
+      <button class="nav-item" data-view="classes">
+        <span class="icon">🏫</span>
+        <span class="label">Turmas</span>
+      </button>
+      <button class="nav-item" data-view="resources">
+        <span class="icon">🔑</span>
+        <span class="label">Recursos</span>
+      </button>
+      <button class="nav-item" data-view="profile">
+        <span class="icon">👤</span>
+        <span class="label">Perfil</span>
+      </button>
+    </nav>
+
+    <!-- Conteúdo -->
+    <main class="app-content">
+      <!-- View: Meu Horário -->
+      <div id="view-schedule" class="view active">
+        <div class="view-header">
+          <h2>Meu Horário</h2>
+          <button id="btn-refresh-schedule" class="btn-icon">🔄</button>
+        </div>
+        <div id="schedule-grid" class="schedule-grid">
+          <p class="loading">Carregando horários...</p>
+        </div>
+      </div>
+
+      <!-- View: Turmas -->
+      <div id="view-classes" class="view">
+        <div class="view-header">
+          <h2>Horário das Turmas</h2>
+        </div>
+        <div class="class-selector">
+          <select id="class-filter">
+            <option value="">Selecione uma turma</option>
+          </select>
+        </div>
+        <div id="class-schedule-grid" class="schedule-grid">
+          <p class="empty-state">Selecione uma turma para ver o horário</p>
+        </div>
+      </div>
+
+      <!-- View: Recursos -->
+      <div id="view-resources" class="view">
+        <div class="view-header">
+          <h2>Agendar Recursos</h2>
+          <button id="btn-my-bookings" class="btn-secondary">Meus Agendamentos</button>
+        </div>
+        <div id="resources-list" class="resources-list">
+          <p class="loading">Carregando recursos...</p>
+        </div>
+      </div>
+
+      <!-- View: Perfil -->
+      <div id="view-profile" class="view">
+        <div class="view-header">
+          <h2>Meu Perfil</h2>
+        </div>
+        <div class="profile-content">
+          <div class="profile-card">
+            <div class="profile-avatar">👨‍🏫</div>
+            <h3 id="profile-name">Professor</h3>
+            <p id="profile-cpf" class="muted"></p>
+          </div>
+          
+          <div class="profile-section">
+            <h4>Disponibilidade</h4>
+            <button id="btn-manage-availability" class="btn-secondary">
+              Gerenciar Disponibilidade
+            </button>
+            <div id="availability-summary"></div>
+          </div>
+          
+          <div class="profile-section">
+            <h4>Configurações</h4>
+            <div class="settings-list">
+              <div class="setting-item">
+                <label>Notificações</label>
+                <input type="checkbox" id="setting-notifications" checked>
+              </div>
+              <div class="setting-item">
+                <label>Modo Escuro</label>
+                <input type="checkbox" id="setting-dark-mode">
+              </div>
+            </div>
+          </div>
+          
+          <button id="btn-logout-main" class="btn-danger">Sair</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal de Agendamento -->
+  <div id="booking-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Agendar Recurso</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="booking-form">
+          <div class="form-group">
+            <label>Recurso</label>
+            <input type="text" id="booking-resource" readonly>
+          </div>
+          <div class="form-group">
+            <label>Data</label>
+            <input type="date" id="booking-date" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Dia da Semana</label>
+              <select id="booking-weekday" required>
+                <option value="1">Segunda</option>
+                <option value="2">Terça</option>
+                <option value="3">Quarta</option>
+                <option value="4">Quinta</option>
+                <option value="5">Sexta</option>
+                <option value="6">Sábado</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Período</label>
+              <input type="number" id="booking-period" min="1" max="10" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Turma</label>
+            <select id="booking-class" required>
+              <option value="">Selecione a turma</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Descrição (opcional)</label>
+            <textarea id="booking-description" rows="3"></textarea>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary modal-cancel">Cancelar</button>
+            <button type="submit" class="btn-primary">Confirmar Agendamento</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast de Notificações -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+  <script>
+    // Registra Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log('Service Worker registrado'))
+        .catch(err => console.error('Erro ao registrar Service Worker:', err));
+    }
+  </script>
+</body>
+</html>

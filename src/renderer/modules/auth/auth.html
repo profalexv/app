@@ -1,0 +1,73 @@
+<div id="auth-screen" class="auth-screen hidden">
+  <!-- Overlay escuro -->
+  <div class="auth-overlay"></div>
+
+  <!-- Container de autenticação -->
+  <div class="auth-container">
+    <!-- Formulário de Login -->
+    <form id="auth-login-form" class="auth-form" style="display: none;">
+      <h1>Aula</h1>
+      <p class="auth-subtitle" id="auth-school-name"></p>
+
+      <div class="form-group">
+        <label for="auth-login-username">Usuário</label>
+        <input type="text" id="auth-login-username" name="username" required placeholder="Nome de usuário">
+      </div>
+
+      <div class="form-group">
+        <label for="auth-login-password">Senha</label>
+        <input type="password" id="auth-login-password" name="password" required placeholder="Sua senha">
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="auth-login-btn">Entrar</button>
+
+      <div class="auth-error" id="auth-login-error"></div>
+
+      <p class="auth-footer">
+        Sistema de Gestão Escolar - Aula
+      </p>
+    </form>
+
+    <!-- Formulário de Primeiro Admin -->
+    <form id="auth-register-form" class="auth-form" style="display: none;">
+      <h1>Bem-vindo ao Aula</h1>
+      <p class="auth-subtitle">Cadastro do primeiro administrador</p>
+
+      <div class="form-group">
+        <label for="auth-register-name">Nome completo</label>
+        <input type="text" id="auth-register-name" name="name" required placeholder="Seu nome">
+      </div>
+
+      <div class="form-group">
+        <label for="auth-register-username">Usuário</label>
+        <input type="text" id="auth-register-username" name="username" required placeholder="Escolha um nome de usuário">
+      </div>
+
+      <div class="form-group">
+        <label for="auth-register-password">Senha</label>
+        <input type="password" id="auth-register-password" name="password" required 
+          placeholder="Escolha uma senha segura (mín. 6 caracteres)">
+      </div>
+
+      <div class="form-group">
+        <label for="auth-register-password-confirm">Confirmar senha</label>
+        <input type="password" id="auth-register-password-confirm" name="password_confirm" required 
+          placeholder="Confirme sua senha">
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="auth-register-btn">Criar Administrador</button>
+
+      <div class="auth-error" id="auth-register-error"></div>
+
+      <p class="auth-footer">
+        Sistema de Gestão Escolar - Aula
+      </p>
+    </form>
+
+    <!-- Loading -->
+    <div id="auth-loading" class="auth-loading" style="display: none;">
+      <div class="spinner"></div>
+      <p>Processando...</p>
+    </div>
+  </div>
+</div>
