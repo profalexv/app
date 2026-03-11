@@ -34,95 +34,20 @@
 
 ## 💻 Para Administradores
 
-### Configuração do Servidor
-
-1. **Instale as dependências**
-   ```bash
-   cd /caminho/para/sistema
-   npm install
-   ```
-
-2. **Inicie o servidor**
-   ```bash
-   # Produção
-   npm run web
-   
-   # Ou com porta customizada
-   PORT=8080 npm run web
-   ```
-
-3. **O AULA.app estará disponível em**
-   - Local: `http://localhost:3000/app`
-   - Rede: `http://{IP-DO-SERVIDOR}:3000/app`
+O AULA.app é servido pelo motor (Fly.io). Não é necessário configurar servidor separado.
+O endereço do app para os professores é:
+```
+https://<dominio-da-escola>/app
+```
 
 ### Deploy em Produção
 
-#### Opção 1: Servidor Próprio
+#### Opção 1: Via Fly.io (recomendado)
 
-1. **Instale Node.js 18+ no servidor**
+O AULA.app é parte do motor. Execute `fly deploy` no repositório `Scholar/motor`.
+O app estará disponível automaticamente em `https://<app>.fly.dev/app`.
 
-2. **Clone/copie o projeto**
-   ```bash
-   git clone [seu-repositorio]
-   cd system
-   npm install --production
-   ```
-
-3. **Configure como serviço (systemd)**
-   ```ini
-   # /etc/systemd/system/aula.service
-   [Unit]
-   Description=AULA - Sistema Escolar
-   After=network.target
-
-   [Service]
-   Type=simple
-   User=www-data
-   WorkingDirectory=/var/www/aula
-   ExecStart=/usr/bin/node server.js
-   Restart=always
-   Environment=NODE_ENV=production
-   Environment=PORT=3000
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-   ```bash
-   sudo systemctl enable aula
-   sudo systemctl start aula
-   ```
-
-4. **Configure Nginx como proxy reverso**
-   ```nginx
-   # /etc/nginx/sites-available/aula
-   server {
-       listen 80;
-       server_name aula.suaescola.com.br;
-
-       location / {
-           proxy_pass http://localhost:3000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection 'upgrade';
-           proxy_set_header Host $host;
-           proxy_cache_bypass $http_upgrade;
-       }
-
-       # Cache para o app
-       location /app/ {
-           proxy_pass http://localhost:3000/app/;
-           add_header Cache-Control "public, max-age=86400";
-       }
-   }
-   ```
-
-5. **Configure SSL (certbot)**
-   ```bash
-   sudo certbot --nginx -d aula.suaescola.com.br
-   ```
-
-#### Opção 2: Docker
+#### Opção 2: Docker (auto-hospedado — planos PRO)
 
 ```dockerfile
 # Dockerfile
@@ -137,23 +62,9 @@ EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-```yaml
-# docker-compose.yml
-version: '3'
-services:
-  aula:
-    build: .
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./data:/root/.config/aula
-    environment:
-      - NODE_ENV=production
-    restart: always
-```
-
 ```bash
-docker-compose up -d
+docker build -t aula .
+docker run -d -p 3000:3000 --env-file .env --restart always aula
 ```
 
 ### Configuração de Ícones Personalizados
@@ -194,23 +105,19 @@ docker-compose logs -f
 
 **Verificar status**
 ```bash
-# Teste de conectividade
-curl http://localhost:3000/api/schools
+# Teste de conectividade com o motor
+curl https://<dominio-da-escola>/api/health
 
 # App mobile
-curl http://localhost:3000/app/
+curl https://<dominio-da-escola>/app/
 ```
 
 ### Backup
 
-**Banco de dados**
-```bash
-# Localização padrão
-~/.config/aula/aula.db
-
-# Backup automático
-cp ~/.config/aula/aula.db ~/backups/aula-$(date +%Y%m%d).db
-```
+O banco de dados é gerenciado pelo Supabase. Backups automáticos são configurados
+no painel Supabase (`project > Database > Backups`).
+Para planos PRO (auto-hospedados), o backup do PostgreSQL é responsabilidade do
+operador da escola.
 
 ## 🔐 Segurança
 

@@ -85,14 +85,13 @@ Incluso em PLUS PREMIUM e PRO PREMIUM. Disponível separadamente:
 ## 6. Estrutura de Arquivos Relevantes
 
 ```
-system/
-  aula/index.html              Landing page (SPA)
+Scholar/app/  (este repositório — Browser SPA)
   src/
     renderer/
-      app.js                   Boot do SPA, ServerDetector, navegação entre abas
+      app.js                   Boot do SPA, navegação entre abas
       index.html               Shell da aplicação
       data/
-        data-provider.js       Abstração de dados (stub SupabaseProvider)
+        data-provider.js       Abstração de dados (SupabaseProvider)
         license-client.js      Controle de módulos por plano (via JWT)
       modules/
         auth/                  Tela de login/cadastro
@@ -100,10 +99,13 @@ system/
         aula/                  Módulo de registro de aulas
         usuarios/              Gestão de professores e pessoas
     utils/
-      logger.js                Winston (logs em ~/.config/aula/logs/)
+      logger.js                Winston
       validators.js            Validação de campos
+  aula-app/                    PWA mobile (App do Professor)
 
-motor/ (repositório separado — Fly.io Node.js)
+Scholar/aula/  (landing page — repositório separado)
+
+Scholar/motor/ (API backend — Fly.io Node.js)
   src/services/
     licenseService.js          PLAN_LIMITS, validação de plano
     authService.js             JWT, login, registro

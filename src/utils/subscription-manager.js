@@ -1,8 +1,8 @@
 /**
  * subscription-manager.js
- * 
- * Gerenciador de assinaturas e planos do sistema AULA
- * Valida limites, períodos de trial e funcionalidades por plano
+ *
+ * Gerenciador de assinaturas e planos do sistema AULA.
+ * Todos os métodos são async — usa Knex (PostgreSQL).
  */
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -14,18 +14,9 @@ const PLANS = {
     id: 'free',
     name: 'Grátis',
     description: 'Cronograma básico - Sempre grátis',
-    price: {
-      monthly: 0,
-      annual: 0,
-      franchise: 0
-    },
+    price: { monthly: 0, annual: 0, franchise: 0 },
     trial: null,
-    limits: {
-      schools: 1,
-      classes: 0,      // ilimitado
-      teachers: 0,     // ilimitado
-      resources: 0     // ilimitado
-    },
+    limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
     features: {
       cronograma: true,
       cadastro_escola: true,
@@ -39,26 +30,13 @@ const PLANS = {
       suporte_prioritario: false
     }
   },
-
   starter: {
     id: 'starter',
     name: 'Starter',
     description: 'Avaliação - Grátis por 1 ano',
-    price: {
-      monthly: 0,
-      annual: 120,     // R$ 120/ano após trial
-      franchise: 0
-    },
-    trial: {
-      duration: 365,   // 1 ano grátis
-      durationUnit: 'days'
-    },
-    limits: {
-      schools: 1,
-      classes: 5,
-      teachers: 22,
-      resources: 0     // ilimitado
-    },
+    price: { monthly: 0, annual: 120, franchise: 0 },
+    trial: { duration: 365, durationUnit: 'days' },
+    limits: { schools: 1, classes: 5, teachers: 22, resources: 0 },
     features: {
       cronograma: true,
       cadastro_escola: true,
@@ -72,26 +50,13 @@ const PLANS = {
       suporte_prioritario: false
     }
   },
-
   pro: {
     id: 'pro',
     name: 'Pro',
     description: 'Completo - Hospedagem local',
-    price: {
-      monthly: 0,
-      annual: 320,     // R$ 320/ano após trial
-      franchise: 0
-    },
-    trial: {
-      duration: 180,   // 6 meses grátis
-      durationUnit: 'days'
-    },
-    limits: {
-      schools: 1,
-      classes: 15,
-      teachers: 60,
-      resources: 0     // ilimitado
-    },
+    price: { monthly: 0, annual: 320, franchise: 0 },
+    trial: { duration: 180, durationUnit: 'days' },
+    limits: { schools: 1, classes: 15, teachers: 60, resources: 0 },
     features: {
       cronograma: true,
       cadastro_escola: true,
@@ -106,25 +71,13 @@ const PLANS = {
       suporte_prioritario: false
     }
   },
-
   plus: {
     id: 'plus',
     name: 'Plus',
     description: 'Local premium - Sem limitações de capacidade',
-    price: {
-      monthly: 0,
-      annual: 820,     // R$ 820/ano (40% desconto no 1º ano)
-      franchise: 0,
-      firstYearDiscount: 0.40,  // 40% desconto no primeiro ano
-      firstYearPrice: 492       // R$ 492/ano no primeiro ano
-    },
+    price: { monthly: 0, annual: 820, franchise: 0, firstYearDiscount: 0.40, firstYearPrice: 492 },
     trial: null,
-    limits: {
-      schools: 1,
-      classes: 0,      // ilimitado
-      teachers: 0,     // ilimitado
-      resources: 0     // ilimitado
-    },
+    limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
     features: {
       cronograma: true,
       cadastro_escola: true,
@@ -142,23 +95,13 @@ const PLANS = {
       expansao_local: true
     }
   },
-
   cloud: {
     id: 'cloud',
     name: 'Cloud',
-    description: 'Instância dedicada em nuvem com SQLite isolado',
-    price: {
-      monthly: 150,    // R$ 150/mês
-      annual: 1800,    // R$ 150 x 12
-      franchise: 400   // R$ 400 franquia (pode parcelar em 12x)
-    },
-    trial: null,       // Sem trial, paga desde o início
-    limits: {
-      schools: 1,
-      classes: 0,      // ilimitado
-      teachers: 0,     // ilimitado
-      resources: 0     // ilimitado
-    },
+    description: 'Instância dedicada em nuvem',
+    price: { monthly: 150, annual: 1800, franchise: 400 },
+    trial: null,
+    limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
     features: {
       cronograma: true,
       cadastro_escola: true,
@@ -171,7 +114,7 @@ const PLANS = {
       backup_local: true,
       backup_cloud: true,
       suporte_prioritario: true,
-      espelhamento_local: true,  // opcional
+      espelhamento_local: true,
       alta_disponibilidade: true,
       escalabilidade_automatica: true,
       instancia_dedicada: true,
@@ -179,23 +122,13 @@ const PLANS = {
       compliance_lgpd: true
     }
   },
-
   online_basic: {
     id: 'online_basic',
     name: 'Online Básico',
     description: 'Multi-tenant em nuvem (PostgreSQL compartilhado)',
-    price: {
-      monthly: 116.67,   // R$ 1400/ano ÷ 12
-      annual: 1400,      // R$ 1400/ano
-      franchise: 0
-    },
+    price: { monthly: 116.67, annual: 1400, franchise: 0 },
     trial: null,
-    limits: {
-      schools: 1,
-      classes: 0,      // ilimitado
-      teachers: 0,     // ilimitado
-      resources: 0     // ilimitado
-    },
+    limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
     features: {
       cronograma: true,
       cadastro_escola: true,
@@ -213,24 +146,13 @@ const PLANS = {
       acesso_mobile: true
     }
   },
-
   online_premium: {
     id: 'online_premium',
     name: 'Online Premium',
     description: 'Multi-tenant + Plataforma de Planos de Aula ILIMITADA',
-    price: {
-      monthly: 183.33,   // R$ 2200/ano ÷ 12
-      annual: 2200,      // R$ 2200/ano
-      franchise: 0
-    },
+    price: { monthly: 183.33, annual: 2200, franchise: 0 },
     trial: null,
-    limits: {
-      schools: 1,
-      classes: 0,      // ilimitado
-      teachers: 0,     // ilimitado
-      resources: 0,    // ilimitado
-      lesson_plan_teachers: 0  // ilimitado (incluído no plano)
-    },
+    limits: { schools: 1, classes: 0, teachers: 0, resources: 0, lesson_plan_teachers: 0 },
     features: {
       cronograma: true,
       cadastro_escola: true,
@@ -254,19 +176,13 @@ const PLANS = {
   }
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ADD-ONS E PACOTES ADICIONAIS
-// ═══════════════════════════════════════════════════════════════════════════
-
 const ADD_ONS = {
   premium_lesson_plans: {
     id: 'premium_lesson_plans',
     name: 'Pacote Premium',
     description: 'Acesso ao editor de planos de aula com biblioteca e templates',
-    price: {
-      annual: 650     // R$ 650/ano
-    },
-    applicablePlans: ['pro', 'plus', 'cloud'],  // Disponível para esses planos
+    price: { annual: 650 },
+    applicablePlans: ['pro', 'plus', 'cloud'],
     features: {
       editor_planos_bncc: true,
       biblioteca_planos: true,
@@ -283,21 +199,17 @@ const ADD_ONS = {
 
 class SubscriptionManager {
   constructor(db) {
-    this.db = db;
+    this.db = db; // instância knex
   }
 
-  /**
-   * Cria uma assinatura inicial para uma escola
-   */
-  createSubscription(schoolId, planType = 'free') {
+  async createSubscription(schoolId, planType = 'free') {
     const plan = PLANS[planType];
     if (!plan) throw new Error(`Plano inválido: ${planType}`);
 
-    const now = new Date().toISOString();
+    const now = new Date();
     let trialEndsAt = null;
     let status = 'active';
 
-    // Se tem período de trial
     if (plan.trial) {
       const trialEnd = new Date();
       trialEnd.setDate(trialEnd.getDate() + plan.trial.duration);
@@ -305,357 +217,199 @@ class SubscriptionManager {
       status = 'trial';
     }
 
-    const featuresJson = JSON.stringify(plan.features);
-
-    const result = this.db.prepare(`
-      INSERT INTO school_subscriptions (
-        school_id, plan_type, status,
-        max_classes, max_teachers, max_schools,
-        trial_started_at, trial_ends_at,
-        monthly_price, annual_price, franchise_fee,
-        franchise_paid, features_json, activated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      schoolId,
-      planType,
+    const [row] = await this.db('school_subscriptions').insert({
+      school_id:       schoolId,
+      plan_type:       planType,
       status,
-      plan.limits.classes,
-      plan.limits.teachers,
-      plan.limits.schools,
-      plan.trial ? now : null,
-      trialEndsAt,
-      plan.price.monthly,
-      plan.price.annual,
-      plan.price.franchise,
-      planType === 'cloud' ? 0 : 1,  // Cloud requer pagamento de franquia
-      featuresJson,
-      now
-    );
+      max_classes:     plan.limits.classes,
+      max_teachers:    plan.limits.teachers,
+      max_schools:     plan.limits.schools,
+      trial_started_at: plan.trial ? now.toISOString() : null,
+      trial_ends_at:   trialEndsAt,
+      monthly_price:   plan.price.monthly,
+      annual_price:    plan.price.annual,
+      franchise_fee:   plan.price.franchise,
+      franchise_paid:  planType !== 'cloud',
+      features_json:   JSON.stringify(plan.features),
+      activated_at:    now.toISOString(),
+      updated_at:      now.toISOString()
+    }).returning('id');
 
-    // Registrar evento no histórico
-    this.addHistoryEvent(result.lastInsertRowid, 'created', planType, 0, 
+    const id = row.id ?? row;
+
+    await this.addHistoryEvent(id, 'created', planType, 0,
       `Assinatura criada no plano ${plan.name}`);
 
     if (plan.trial) {
-      this.addHistoryEvent(result.lastInsertRowid, 'trial_started', planType, 0,
+      await this.addHistoryEvent(id, 'trial_started', planType, 0,
         `Período de trial iniciado (${plan.trial.duration} dias)`);
     }
 
-    return result.lastInsertRowid;
+    return id;
   }
 
-  /**
-   * Obtém assinatura de uma escola
-   */
-  getSubscription(schoolId) {
-    const sub = this.db.prepare(`
-      SELECT * FROM school_subscriptions WHERE school_id = ?
-    `).get(schoolId);
-
+  async getSubscription(schoolId) {
+    const sub = await this.db('school_subscriptions').where({ school_id: schoolId }).first();
     if (!sub) return null;
 
-    // Parse do JSON de features
     if (sub.features_json) {
-      try {
-        sub.features = JSON.parse(sub.features_json);
-      } catch (e) {
-        sub.features = {};
-      }
+      try { sub.features = JSON.parse(sub.features_json); } catch { sub.features = {}; }
     }
-
-    // Adicionar info do plano
     sub.plan = PLANS[sub.plan_type] || PLANS.free;
-
     return sub;
   }
 
-  /**
-   * Valida se uma escola pode criar uma nova turma
-   */
-  canCreateClass(schoolId) {
-    const sub = this.getSubscription(schoolId);
+  async canCreateClass(schoolId) {
+    const sub = await this.getSubscription(schoolId);
     if (!sub) return { allowed: false, reason: 'Assinatura não encontrada' };
-
-    // Verificar se assinatura está ativa
-    if (!this.isActive(sub)) {
-      return { allowed: false, reason: 'Assinatura expirada ou inativa' };
-    }
-
-    // Se limite é 0, é ilimitado
+    if (!await this.isActive(sub)) return { allowed: false, reason: 'Assinatura expirada ou inativa' };
     if (sub.max_classes === 0) return { allowed: true };
 
-    // Contar turmas existentes
-    const count = this.db.prepare(`
-      SELECT COUNT(*) as cnt FROM classes WHERE school_id = ?
-    `).get(schoolId).cnt;
+    const [{ cnt }] = await this.db('classes').where({ school_id: schoolId }).count('id as cnt');
+    const count = parseInt(cnt, 10);
 
     if (count >= sub.max_classes) {
-      return { 
-        allowed: false, 
-        reason: `Limite de ${sub.max_classes} turmas atingido. Upgrade necessário.`,
-        current: count,
-        limit: sub.max_classes
-      };
+      return { allowed: false, reason: `Limite de ${sub.max_classes} turmas atingido. Upgrade necessário.`, current: count, limit: sub.max_classes };
     }
-
     return { allowed: true, current: count, limit: sub.max_classes };
   }
 
-  /**
-   * Valida se uma escola pode criar um novo professor
-   */
-  canCreateTeacher(schoolId) {
-    const sub = this.getSubscription(schoolId);
+  async canCreateTeacher(schoolId) {
+    const sub = await this.getSubscription(schoolId);
     if (!sub) return { allowed: false, reason: 'Assinatura não encontrada' };
-
-    if (!this.isActive(sub)) {
-      return { allowed: false, reason: 'Assinatura expirada ou inativa' };
-    }
-
+    if (!await this.isActive(sub)) return { allowed: false, reason: 'Assinatura expirada ou inativa' };
     if (sub.max_teachers === 0) return { allowed: true };
 
-    // Contar professores ativos
-    const count = this.db.prepare(`
-      SELECT COUNT(DISTINCT p.id) as cnt
-      FROM people p
-      JOIN role_teacher rt ON rt.person_id = p.id
-      WHERE p.school_id = ? AND rt.active = 1
-    `).get(schoolId).cnt;
+    const [{ cnt }] = await this.db('teachers').where({ school_id: schoolId, active: true }).count('id as cnt');
+    const count = parseInt(cnt, 10);
 
     if (count >= sub.max_teachers) {
-      return {
-        allowed: false,
-        reason: `Limite de ${sub.max_teachers} professores atingido. Upgrade necessário.`,
-        current: count,
-        limit: sub.max_teachers
-      };
+      return { allowed: false, reason: `Limite de ${sub.max_teachers} professores atingido. Upgrade necessário.`, current: count, limit: sub.max_teachers };
     }
-
     return { allowed: true, current: count, limit: sub.max_teachers };
   }
 
-  /**
-   * Verifica se uma feature está disponível no plano
-   */
-  hasFeature(schoolId, featureName) {
-    const sub = this.getSubscription(schoolId);
+  async hasFeature(schoolId, featureName) {
+    const sub = await this.getSubscription(schoolId);
     if (!sub) return false;
-
-    if (!this.isActive(sub)) return false;
-
+    if (!await this.isActive(sub)) return false;
     return sub.features && sub.features[featureName] === true;
   }
 
-  /**
-   * Verifica se assinatura está ativa
-   */
-  isActive(subscription) {
+  async isActive(subscription) {
     if (!subscription) return false;
-
     const now = new Date();
 
-    // Trial expirado?
     if (subscription.status === 'trial' && subscription.trial_ends_at) {
-      const trialEnd = new Date(subscription.trial_ends_at);
-      if (now > trialEnd) {
-        // Expirar automaticamente
-        this.expireTrial(subscription.id);
+      if (now > new Date(subscription.trial_ends_at)) {
+        await this.expireTrial(subscription.id);
         return false;
       }
     }
 
-    // Status inativo?
-    if (['expired', 'cancelled'].includes(subscription.status)) {
-      return false;
-    }
-
-    // Plano cloud requer pagamento de franquia
-    if (subscription.plan_type === 'cloud' && !subscription.franchise_paid) {
-      return false;
-    }
-
-    // Verificar data de expiração
-    if (subscription.expires_at) {
-      const expiresAt = new Date(subscription.expires_at);
-      if (now > expiresAt) {
-        return false;
-      }
-    }
+    if (['expired', 'cancelled'].includes(subscription.status)) return false;
+    if (subscription.plan_type === 'cloud' && !subscription.franchise_paid) return false;
+    if (subscription.expires_at && now > new Date(subscription.expires_at)) return false;
 
     return true;
   }
 
-  /**
-   * Expira o período de trial
-   */
-  expireTrial(subscriptionId) {
-    this.db.prepare(`
-      UPDATE school_subscriptions 
-      SET status = 'expired', updated_at = datetime('now')
-      WHERE id = ?
-    `).run(subscriptionId);
+  async expireTrial(subscriptionId) {
+    await this.db('school_subscriptions').where({ id: subscriptionId }).update({
+      status: 'expired',
+      updated_at: new Date().toISOString()
+    });
 
-    const sub = this.db.prepare(`
-      SELECT plan_type FROM school_subscriptions WHERE id = ?
-    `).get(subscriptionId);
-
-    this.addHistoryEvent(subscriptionId, 'trial_ended', sub.plan_type, 0,
-      'Período de trial expirado');
+    const sub = await this.db('school_subscriptions').where({ id: subscriptionId }).select('plan_type').first();
+    await this.addHistoryEvent(subscriptionId, 'trial_ended', sub.plan_type, 0, 'Período de trial expirado');
   }
 
-  /**
-   * Registra pagamento e ativa assinatura
-   */
-  recordPayment(subscriptionId, amount, notes = '') {
+  async recordPayment(subscriptionId, amount, notes = '') {
     const now = new Date().toISOString();
     const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1); // +1 ano
+    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-    this.db.prepare(`
-      UPDATE school_subscriptions
-      SET status = 'active',
-          last_payment_at = ?,
-          expires_at = ?,
-          updated_at = ?
-      WHERE id = ?
-    `).run(now, expiresAt.toISOString(), now, subscriptionId);
+    await this.db('school_subscriptions').where({ id: subscriptionId }).update({
+      status: 'active',
+      last_payment_at: now,
+      expires_at: expiresAt.toISOString(),
+      updated_at: now
+    });
 
-    const sub = this.db.prepare(`
-      SELECT plan_type FROM school_subscriptions WHERE id = ?
-    `).get(subscriptionId);
-
-    this.addHistoryEvent(subscriptionId, 'payment_received', sub.plan_type, amount,
-      notes || `Pagamento de R$ ${amount.toFixed(2)} recebido`);
+    const sub = await this.db('school_subscriptions').where({ id: subscriptionId }).select('plan_type').first();
+    await this.addHistoryEvent(subscriptionId, 'payment_received', sub.plan_type, amount,
+      notes || `Pagamento de R$ ${Number(amount).toFixed(2)} recebido`);
   }
 
-  /**
-   * Registra pagamento de franquia (plano cloud)
-   */
-  recordFranchisePayment(subscriptionId, amount) {
+  async recordFranchisePayment(subscriptionId, amount) {
     const now = new Date().toISOString();
+    await this.db('school_subscriptions').where({ id: subscriptionId }).update({
+      franchise_paid: true,
+      last_payment_at: now,
+      updated_at: now
+    });
 
-    this.db.prepare(`
-      UPDATE school_subscriptions
-      SET franchise_paid = 1,
-          last_payment_at = ?,
-          updated_at = ?
-      WHERE id = ?
-    `).run(now, now, subscriptionId);
-
-    const sub = this.db.prepare(`
-      SELECT plan_type FROM school_subscriptions WHERE id = ?
-    `).get(subscriptionId);
-
-    this.addHistoryEvent(subscriptionId, 'payment_received', sub.plan_type, amount,
-      `Franquia de R$ ${amount.toFixed(2)} paga`);
+    const sub = await this.db('school_subscriptions').where({ id: subscriptionId }).select('plan_type').first();
+    await this.addHistoryEvent(subscriptionId, 'payment_received', sub.plan_type, amount,
+      `Franquia de R$ ${Number(amount).toFixed(2)} paga`);
   }
 
-  /**
-   * Faz upgrade de plano
-   */
-  upgradePlan(subscriptionId, newPlanType) {
+  async upgradePlan(subscriptionId, newPlanType) {
     const newPlan = PLANS[newPlanType];
     if (!newPlan) throw new Error(`Plano inválido: ${newPlanType}`);
 
-    const oldSub = this.db.prepare(`
-      SELECT plan_type FROM school_subscriptions WHERE id = ?
-    `).get(subscriptionId);
+    const oldSub = await this.db('school_subscriptions').where({ id: subscriptionId }).select('plan_type').first();
 
-    const now = new Date().toISOString();
-    const featuresJson = JSON.stringify(newPlan.features);
+    await this.db('school_subscriptions').where({ id: subscriptionId }).update({
+      plan_type:     newPlanType,
+      max_classes:   newPlan.limits.classes,
+      max_teachers:  newPlan.limits.teachers,
+      monthly_price: newPlan.price.monthly,
+      annual_price:  newPlan.price.annual,
+      franchise_fee: newPlan.price.franchise,
+      features_json: JSON.stringify(newPlan.features),
+      updated_at:    new Date().toISOString()
+    });
 
-    this.db.prepare(`
-      UPDATE school_subscriptions
-      SET plan_type = ?,
-          max_classes = ?,
-          max_teachers = ?,
-          monthly_price = ?,
-          annual_price = ?,
-          franchise_fee = ?,
-          features_json = ?,
-          updated_at = ?
-      WHERE id = ?
-    `).run(
-      newPlanType,
-      newPlan.limits.classes,
-      newPlan.limits.teachers,
-      newPlan.price.monthly,
-      newPlan.price.annual,
-      newPlan.price.franchise,
-      featuresJson,
-      now,
-      subscriptionId
-    );
-
-    this.addHistoryEvent(subscriptionId, 'plan_upgraded', newPlanType, 0,
+    await this.addHistoryEvent(subscriptionId, 'plan_upgraded', newPlanType, 0,
       `Upgrade de ${oldSub.plan_type} para ${newPlanType}`);
   }
 
-  /**
-   * Adiciona evento no histórico
-   */
-  addHistoryEvent(subscriptionId, eventType, planType, amount, notes) {
-    this.db.prepare(`
-      INSERT INTO subscription_history (subscription_id, event_type, plan_type, amount, notes)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(subscriptionId, eventType, planType, amount, notes);
+  async addHistoryEvent(subscriptionId, eventType, planType, amount, notes) {
+    await this.db('subscription_history').insert({
+      subscription_id: subscriptionId,
+      event_type: eventType,
+      plan_type: planType,
+      amount,
+      notes
+    });
   }
 
-  /**
-   * Obtém histórico de uma assinatura
-   */
-  getHistory(subscriptionId) {
-    return this.db.prepare(`
-      SELECT * FROM subscription_history
-      WHERE subscription_id = ?
-      ORDER BY created_at DESC
-    `).all(subscriptionId);
+  async getHistory(subscriptionId) {
+    return this.db('subscription_history')
+      .where({ subscription_id: subscriptionId })
+      .orderBy('created_at', 'desc');
   }
 
-  /**
-   * Obtém informações de uso atual
-   */
-  getUsageStats(schoolId) {
-    const classCount = this.db.prepare(`
-      SELECT COUNT(*) as cnt FROM classes WHERE school_id = ?
-    `).get(schoolId).cnt;
-
-    const teacherCount = this.db.prepare(`
-      SELECT COUNT(DISTINCT p.id) as cnt
-      FROM people p
-      JOIN role_teacher rt ON rt.person_id = p.id
-      WHERE p.school_id = ? AND rt.active = 1
-    `).get(schoolId).cnt;
-
-    const resourceCount = this.db.prepare(`
-      SELECT COUNT(*) as cnt FROM resources WHERE school_id = ?
-    `).get(schoolId).cnt;
+  async getUsageStats(schoolId) {
+    const [[{ cnt: classes }], [{ cnt: teachers }], [{ cnt: resources }]] = await Promise.all([
+      this.db('classes').where({ school_id: schoolId }).count('id as cnt'),
+      this.db('teachers').where({ school_id: schoolId, active: true }).count('id as cnt'),
+      this.db('resources').where({ school_id: schoolId }).count('id as cnt')
+    ]);
 
     return {
-      classes: classCount,
-      teachers: teacherCount,
-      resources: resourceCount
+      classes:   parseInt(classes, 10),
+      teachers:  parseInt(teachers, 10),
+      resources: parseInt(resources, 10)
     };
   }
 
-  /**
-   * Obtém detalhes de um plano específico
-   */
   getPlanDetails(planType) {
     const plan = PLANS[planType];
-    if (!plan) {
-      throw new Error(`Plano inválido: ${planType}`);
-    }
+    if (!plan) throw new Error(`Plano inválido: ${planType}`);
     return plan;
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// EXPORTAÇÃO
-// ═══════════════════════════════════════════════════════════════════════════
-
-module.exports = {
-  SubscriptionManager,
-  PLANS,
-  ADD_ONS
-};
+module.exports = { SubscriptionManager, PLANS, ADD_ONS };

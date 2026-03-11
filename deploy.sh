@@ -123,10 +123,10 @@ fi
 # docker-compose --profile with-nginx up -d nginx
 
 echo ""
-echo -e "${BLUE}📊 Backup Automático${NC}"
-echo "==================="
+echo -e "${BLUE}📊 Backup Automático (planos PRO — auto-hospedado)${NC}"
+echo "==================================================="
 
-# Cria script de backup
+# Cria script de backup do banco local (SQLite — planos PRO)
 cat > backup.sh << 'EOF'
 #!/bin/bash
 BACKUP_DIR="/opt/aula/backups"

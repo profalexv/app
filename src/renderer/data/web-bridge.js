@@ -1,21 +1,15 @@
 /**
  * web-bridge.js
  *
- * Quando o sistema roda no navegador (via servidor web Express),
- * este script cria window.aula com o mesmo contrato da
- * preload.js do Electron, mas usando fetch() para chamar a API REST.
+ * Cria window.aula com o contrato de dados do sistema,
+ * usando fetch() para chamar a API REST do motor (Fly.io).
  *
  * Carregue este script ANTES de qualquer outro no renderer:
  *   <script src="data/web-bridge.js"></script>
- *
- * Em ambiente Electron, o preload.js já injeta window.aula;
- * este script não faz nada nesse caso.
- *
- * Nota: window.aula é mantido por compatibilidade com código legado.
  */
 
 (function () {
-  // Já existe (Electron injetou via preload.js) → não faz nada
+  // Já existe → não sobrescreve
   if (window.aula) return;
 
   // ─── Base URL da API ────────────────────────────────────────────────────────

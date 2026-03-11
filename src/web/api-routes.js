@@ -1,10 +1,10 @@
 /**
  * src/web/api-routes.js
  *
- * Router Express com todos os endpoints REST que espelham os handlers IPC.
- * O frontend usa web-bridge.js para chamar estas rotas em vez do IPC do Electron.
+ * Router Express com todos os endpoints REST.
+ * O frontend usa web-bridge.js para chamar estas rotas via fetch().
  *
- * Todas as respostas seguem o mesmo formato dos handlers IPC:
+ * Todas as respostas seguem o formato:
  *   { success: boolean, data?: any, error?: string }
  */
 

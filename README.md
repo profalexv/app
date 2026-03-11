@@ -39,13 +39,13 @@ Trial de 14 dias. 40% de desconto no 1º ano.
 
 ## Desenvolvimento
 
-```bash
-# Servir SPA localmente
-npm start               # node server.js
-npm run dev             # node server.js --dev
-```
+Este repositório é um Browser SPA puro — em produção é servido diretamente pelo motor (Fly.io).
+Para testar localmente é possível abrir `src/renderer/index.html` diretamente no navegador ou servir com qualquer servidor HTTP estático.
 
-Acesse: `http://localhost:3000`
+```bash
+# Opção: servidor estático simples
+npx serve .
+```
 
 ## Documentação
 

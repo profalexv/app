@@ -1,19 +1,16 @@
 /**
  * server.js
  *
- * Servidor web Express para a versão web do sistema Aula.
- * Expõe a mesma lógica de negócio do app Electron via REST API,
- * e serve os arquivos estáticos do renderer.
+ * Servidor Express para modo auto-hospedado (planos PRO).
+ * Serve os arquivos estáticos do renderer e expõe a API REST.
  *
  * Uso:
  *   node server.js          → modo produção (porta 3000)
  *   node server.js --dev    → modo desenvolvimento (licenças liberadas)
  *   PORT=8080 node server.js → porta customizada
  *
- * O banco de dados compartilhado com o app Electron fica em:
- *   Linux:   ~/.config/aula/aula.db
- *   macOS:   ~/Library/Application Support/aula/aula.db
- *   Windows: %APPDATA%\aula\aula.db
+ * Em produção hospedada, o motor (Fly.io) serve o frontend diretamente.
+ * Este servidor é usado apenas para planos PRO (auto-hospedados via Cloudflare Tunnel).
  */
 
 const express = require('express');

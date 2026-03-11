@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Inicializa a detecção automática de servidor (local, VPN ou cloud)
   await window.AppServerDetection.initialize();
 
-  // Inicializa o data provider (SQLite local via IPC)
+  // Inicializa o data provider
   window.DB.init();
 
   // Carrega licenças e aplica cadeados nas abas

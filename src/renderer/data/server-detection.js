@@ -27,24 +27,22 @@ class ServerDetector {
   async detect() {
     const now = Date.now();
 
-    // No app desktop (Electron), os dados são locais via IPC e não dependem de API HTTP.
-    // Evita tentativas de rede desnecessárias e ruído no console.
-    if (window.aula) {
-      const localDesktop = {
-        type: 'local',
-        url: 'ipc://local',
-        latency: 0,
-        priority: 0
-      };
+    // Sem detecção necessária: dados via API REST
+    // (mantido por compatibilidade com código que chama detect())
+    const webMode = {
+      type: 'cloud',
+      url: window.location.origin,
+      latency: 0,
+      priority: 1
+    };
 
-      this.serverType = localDesktop.type;
-      this.serverUrl = localDesktop.url;
-      this.allEndpoints = [localDesktop];
-      this.detectionCache = localDesktop;
-      this.cacheExpiry = now + (5 * 60 * 1000);
+    this.serverType = webMode.type;
+    this.serverUrl = webMode.url;
+    this.allEndpoints = [webMode];
+    this.detectionCache = webMode;
+    this.cacheExpiry = now + (5 * 60 * 1000);
 
-      return localDesktop;
-    }
+    return webMode;
     
     // Cache por 5 minutos se detectou com sucesso
     if (this.detectionCache && this.cacheExpiry && now < this.cacheExpiry) {

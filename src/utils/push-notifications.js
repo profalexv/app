@@ -184,13 +184,10 @@ class PushNotificationManager {
    */
   async notifyClassTeachers(classId, message, type = 'class-change') {
     try {
-      const teachers = this.db.prepare(`
-        SELECT DISTINCT p.id, p.name
-        FROM people p
-        JOIN role_teacher rt ON p.id = rt.person_id
-        JOIN class_teacher_curricula ctc ON p.id = ctc.teacher_id
-        WHERE ctc.class_id = ?
-      `).all(classId);
+      const teachers = await this.db('teachers')
+        .join('class_teacher_curricula as ctc', 'ctc.teacher_id', 'teachers.id')
+        .where('ctc.class_id', classId)
+        .distinct('teachers.id', 'teachers.name');
 
       const results = [];
       for (const teacher of teachers) {
