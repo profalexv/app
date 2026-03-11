@@ -1,290 +1,225 @@
 /**
  * src/db/database-web.js
  *
- * Módulo de banco de dados PostgreSQL para o modo auto-hospedado (planos PRO).
- * O cliente instala o PostgreSQL no próprio servidor e configura DATABASE_URL.
+ * Módulo de banco de dados — usa Supabase JS SDK (mesmo que o motor).
+ * Expõe uma interface Knex-compatível para minimizar mudanças no rest do código.
+ *
+ * Dev:   SUPABASE_URL + SUPABASE_SERVICE_KEY do motor/.env
+ * Prod:  mesmas variáveis nas secrets do Fly.io
+ *
+ * A tabela 'schools' é renomeada para 'app_schools' automaticamente para
+ * evitar conflito com a tabela 'schools' do motor (UUID x SERIAL).
  *
  * Exporta:
- *   setupDatabase()          — cria tabelas se não existirem (async)
- *   getDb()                  — retorna a instância knex (singleton)
+ *   setupDatabase()          — inicializa cliente Supabase, verifica conexão
+ *   getDb()                  — retorna função-fábrica Knex-compatível
  *   hashPassword(pw)         — retorna hash bcrypt (Promise)
  *   verifyPassword(pw, hash) — valida hash bcrypt (Promise)
  */
 
 'use strict';
 
+const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
 
-let _knex = null;
+let _supabase = null;
 
+// Tabelas que conflitam com o motor — renomeadas automaticamente
+const TABLE_MAP = { schools: 'app_schools' };
+
+// ─── Query builder Knex-compatível ───────────────────────────────────────────
+class TableQuery {
+  constructor(supabase, tableName) {
+    this._sb      = supabase;
+    this._table   = TABLE_MAP[tableName] || tableName;
+    this._op      = 'select';
+    this._cols    = '*';
+    this._eqs     = [];   // { col, val }
+    this._neqs    = [];   // { col, val }
+    this._lts     = [];   // { col, val }
+    this._gtes    = [];   // { col, val }
+    this._ins     = [];   // { col, vals }
+    this._data    = null;
+    this._ret     = null; // returning cols
+    this._first   = false;
+    this._orders  = [];   // { col, asc }
+    this._limitN  = null;
+    this._isCount = false;
+    this._cntAlias = 'cnt';
+  }
+
+  select(cols = '*') {
+    this._cols = Array.isArray(cols) ? cols.join(', ') : cols;
+    return this;
+  }
+
+  where(condOrCol, val) {
+    if (condOrCol && typeof condOrCol === 'object') {
+      for (const [k, v] of Object.entries(condOrCol)) this._eqs.push({ col: k, val: v });
+    } else if (typeof condOrCol === 'string') {
+      this._eqs.push({ col: condOrCol, val });
+    }
+    return this;
+  }
+
+  whereNot(condOrCol, val) {
+    if (condOrCol && typeof condOrCol === 'object') {
+      for (const [k, v] of Object.entries(condOrCol)) this._neqs.push({ col: k, val: v });
+    } else if (typeof condOrCol === 'string') {
+      this._neqs.push({ col: condOrCol, val });
+    }
+    return this;
+  }
+
+  whereIn(col, vals) { this._ins.push({ col, vals }); return this; }
+
+  // Converte padrões de expiração de sessão conhecidos para lt/gte
+  whereRaw(sql) {
+    const hours = parseInt(sql.match(/(\d+)\s*hours?/i)?.[1] || 8);
+    const cutoff = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+    if (/</.test(sql)) this._lts.push({ col: 'created_at', val: cutoff });
+    else               this._gtes.push({ col: 'created_at', val: cutoff });
+    return this;
+  }
+
+  insert(data) { this._op = 'insert'; this._data = data; return this; }
+  update(data) { this._op = 'update'; this._data = data; return this; }
+  del()        { this._op = 'delete'; return this; }
+  delete()     { return this.del(); }
+
+  returning(cols) {
+    this._ret = Array.isArray(cols) ? cols.join(', ') : cols;
+    return this;
+  }
+
+  orderBy(colOrArr, dir = 'asc') {
+    if (Array.isArray(colOrArr)) {
+      colOrArr.forEach(o => {
+        if (typeof o === 'string') this._orders.push({ col: o, asc: true });
+        else this._orders.push({ col: o.column || o.col || o, asc: (o.order || o.dir || 'asc') === 'asc' });
+      });
+    } else {
+      this._orders.push({ col: colOrArr, asc: dir === 'asc' });
+    }
+    return this;
+  }
+
+  first()    { this._first = true;  return this; }
+  limit(n)   { this._limitN = n;    return this; }
+
+  count(alias = 'id as cnt') {
+    this._isCount = true;
+    this._cntAlias = (alias.split(' as ')[1] || alias).trim();
+    return this;
+  }
+
+  then(resolve, reject) { return this._exec().then(resolve, reject); }
+  catch(fn)             { return this._exec().catch(fn); }
+
+  _applyFilters(q) {
+    for (const f of this._eqs)  q = q.eq(f.col, f.val);
+    for (const f of this._neqs) q = q.neq(f.col, f.val);
+    for (const f of this._lts)  q = q.lt(f.col, f.val);
+    for (const f of this._gtes) q = q.gte(f.col, f.val);
+    for (const f of this._ins)  q = q.in(f.col, f.vals);
+    return q;
+  }
+
+  async _exec() {
+    if (!_supabase) throw new Error('Banco não inicializado. Chame setupDatabase() primeiro.');
+
+    // ── COUNT ──────────────────────────────────────────────────────────────
+    if (this._isCount) {
+      let q = this._sb.from(this._table).select('*', { count: 'exact', head: true });
+      q = this._applyFilters(q);
+      const { count, error } = await q;
+      if (error) throw new Error(error.message);
+      return [{ [this._cntAlias]: count ?? 0 }];
+    }
+
+    // ── SELECT ─────────────────────────────────────────────────────────────
+    if (this._op === 'select') {
+      let q = this._sb.from(this._table).select(this._cols);
+      q = this._applyFilters(q);
+      for (const o of this._orders) q = q.order(o.col, { ascending: o.asc });
+      if (this._limitN) q = q.limit(this._limitN);
+      const { data, error } = await q.limit(this._first ? 1 : (this._limitN || 10000));
+      if (error) throw new Error(error.message);
+      if (this._first) return Array.isArray(data) ? (data[0] ?? undefined) : undefined;
+      return data ?? [];
+    }
+
+    // ── INSERT ─────────────────────────────────────────────────────────────
+    if (this._op === 'insert') {
+      let q = this._sb.from(this._table).insert(this._data);
+      if (this._ret) q = q.select(this._ret);
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      if (this._ret) return Array.isArray(data) ? data : (data ? [data] : []);
+      return data;
+    }
+
+    // ── UPDATE ─────────────────────────────────────────────────────────────
+    if (this._op === 'update') {
+      let q = this._sb.from(this._table).update(this._data);
+      q = this._applyFilters(q);
+      if (this._ret) q = q.select(this._ret);
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      return data;
+    }
+
+    // ── DELETE ─────────────────────────────────────────────────────────────
+    if (this._op === 'delete') {
+      let q = this._sb.from(this._table).delete();
+      q = this._applyFilters(q);
+      const { error } = await q;
+      if (error) throw new Error(error.message);
+    }
+  }
+}
+
+// ─── API pública ──────────────────────────────────────────────────────────────
+/**
+ * Retorna uma função-fábrica Knex-compatível: getDb()('tabela').where({...})
+ * Também expõe:
+ *   getDb().rpc(fn, args)              — chamada a stored procedure Supabase
+ *   getDb().upsert(table, data, opts)  — upsert nativo Supabase
+ */
 function getDb() {
-  if (!_knex) throw new Error('Banco não inicializado. Chame setupDatabase() primeiro.');
-  return _knex;
+  const factory = (tableName) => new TableQuery(_supabase, tableName);
+  factory.rpc    = (fn, args)             => _supabase?.rpc(fn, args);
+  factory.upsert = (table, data, opts)    => _supabase?.from(TABLE_MAP[table] || table).upsert(data, opts);
+  // raw() legado — lança erro descritivo
+  factory.raw    = (_sql) => { throw new Error('getDb().raw() não suportado no modo Supabase. Refatore para rpc() ou upsert().'); };
+  return factory;
 }
 
 async function setupDatabase() {
-  if (!process.env.DATABASE_URL) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+
+  if (!url || !key) {
     throw new Error(
-      'DATABASE_URL não configurada.\n' +
-      'Exemplo: DATABASE_URL=postgresql://usuario:senha@localhost:5432/aula'
+      'SUPABASE_URL e SUPABASE_SERVICE_KEY não configurados.\n' +
+      'Copie do motor/.env (dev) ou configure as secrets do servidor (prod).'
     );
   }
 
-  _knex = require('knex')({
-    client: 'pg',
-    connection: process.env.DATABASE_URL,
-    pool: { min: 2, max: 10 }
-  });
+  _supabase = createClient(url, key, { auth: { persistSession: false } });
 
-  // Verifica conexão
-  await _knex.raw('SELECT 1');
-
-  const stmts = [
-    // ── Superadmins ──────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS superadmins (
-      id         SERIAL PRIMARY KEY,
-      name       TEXT    NOT NULL,
-      username   TEXT    NOT NULL UNIQUE,
-      password   TEXT    NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE TABLE IF NOT EXISTS superadmin_sessions (
-      id         SERIAL PRIMARY KEY,
-      admin_id   INTEGER NOT NULL REFERENCES superadmins(id) ON DELETE CASCADE,
-      token      TEXT    NOT NULL UNIQUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Escolas ───────────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS schools (
-      id         SERIAL PRIMARY KEY,
-      name       TEXT    NOT NULL,
-      acronym    TEXT,
-      address    TEXT,
-      cnpj       TEXT,
-      inep_code  TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Admins ────────────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS admins (
-      id         SERIAL PRIMARY KEY,
-      school_id  INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      name       TEXT    NOT NULL,
-      username   TEXT    NOT NULL UNIQUE,
-      password   TEXT    NOT NULL,
-      active     BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE TABLE IF NOT EXISTS admin_sessions (
-      id         SERIAL PRIMARY KEY,
-      school_id  INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      admin_id   INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
-      token      TEXT    NOT NULL UNIQUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Professores ───────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS teachers (
-      id           SERIAL PRIMARY KEY,
-      school_id    INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      name         TEXT    NOT NULL,
-      registration TEXT,
-      email        TEXT,
-      subjects     TEXT,
-      active       BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE TABLE IF NOT EXISTS sessions (
-      id         SERIAL PRIMARY KEY,
-      person_id  INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
-      token      TEXT    NOT NULL UNIQUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE TABLE IF NOT EXISTS teacher_availability (
-      id         SERIAL PRIMARY KEY,
-      teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
-      weekday    INTEGER NOT NULL,
-      period     INTEGER NOT NULL,
-      UNIQUE(teacher_id, weekday, period)
-    )`,
-    `CREATE TABLE IF NOT EXISTS teacher_days (
-      id         SERIAL PRIMARY KEY,
-      teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
-      weekday    INTEGER NOT NULL,
-      UNIQUE(teacher_id, weekday)
-    )`,
-    // ── Turnos ────────────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS shifts (
-      id         SERIAL PRIMARY KEY,
-      school_id  INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      name       TEXT    NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE TABLE IF NOT EXISTS time_slots (
-      id         SERIAL PRIMARY KEY,
-      shift_id   INTEGER NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
-      period     INTEGER NOT NULL,
-      start_time TEXT    NOT NULL DEFAULT '',
-      end_time   TEXT    NOT NULL DEFAULT '',
-      UNIQUE(shift_id, period)
-    )`,
-    // ── Turmas ────────────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS classes (
-      id         SERIAL PRIMARY KEY,
-      school_id  INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      shift_id   INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
-      name       TEXT    NOT NULL,
-      year       INTEGER,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Componentes curriculares ─────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS curricula (
-      id          SERIAL PRIMARY KEY,
-      school_id   INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      name        TEXT    NOT NULL,
-      code        TEXT,
-      description TEXT,
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE TABLE IF NOT EXISTS class_curricula (
-      id           SERIAL PRIMARY KEY,
-      class_id     INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
-      curricula_id INTEGER NOT NULL REFERENCES curricula(id) ON DELETE CASCADE,
-      UNIQUE(class_id, curricula_id)
-    )`,
-    `CREATE TABLE IF NOT EXISTS class_teacher_curricula (
-      id                 SERIAL PRIMARY KEY,
-      class_id           INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
-      curricula_id       INTEGER NOT NULL REFERENCES curricula(id) ON DELETE CASCADE,
-      teacher_id         INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
-      class_curricula_id INTEGER REFERENCES class_curricula(id) ON DELETE SET NULL,
-      UNIQUE(class_id, curricula_id, teacher_id)
-    )`,
-    // ── Cronogramas ───────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS schedules (
-      id         SERIAL PRIMARY KEY,
-      school_id  INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      name       TEXT    NOT NULL,
-      year       INTEGER NOT NULL,
-      semester   INTEGER NOT NULL DEFAULT 1,
-      active     BOOLEAN NOT NULL DEFAULT FALSE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE TABLE IF NOT EXISTS lessons (
-      id          SERIAL PRIMARY KEY,
-      schedule_id INTEGER REFERENCES schedules(id) ON DELETE CASCADE,
-      resource_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
-      teacher_id  INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
-      person_id   INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
-      weekday     INTEGER NOT NULL,
-      period      INTEGER NOT NULL,
-      subject     TEXT,
-      classroom   TEXT,
-      notes       TEXT,
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Planos de aula ────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS lesson_plans (
-      id               SERIAL PRIMARY KEY,
-      school_id        INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      teacher_id       INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
-      subject          TEXT,
-      title            TEXT    NOT NULL,
-      objectives       TEXT,
-      content          TEXT,
-      methodology      TEXT,
-      resources        TEXT,
-      evaluation       TEXT,
-      duration_minutes INTEGER,
-      date             TEXT,
-      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Recursos ─────────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS resources (
-      id          SERIAL PRIMARY KEY,
-      school_id   INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      name        TEXT    NOT NULL,
-      type        TEXT,
-      capacity    INTEGER,
-      description TEXT,
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Agendamentos ──────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS bookings (
-      id          SERIAL PRIMARY KEY,
-      resource_id INTEGER NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
-      teacher_id  INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
-      class_id    INTEGER REFERENCES classes(id) ON DELETE SET NULL,
-      weekday     INTEGER,
-      period      INTEGER,
-      date        TEXT,
-      description TEXT,
-      status      TEXT    NOT NULL DEFAULT 'confirmado',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Licenças ─────────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS licenses (
-      id           SERIAL PRIMARY KEY,
-      module_id    TEXT    NOT NULL UNIQUE,
-      license_key  TEXT    NOT NULL,
-      activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      expires_at   TIMESTAMPTZ
-    )`,
-    // ── Assinaturas ───────────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS school_subscriptions (
-      id               SERIAL PRIMARY KEY,
-      school_id        INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
-      plan_type        TEXT    NOT NULL DEFAULT 'free',
-      status           TEXT    NOT NULL DEFAULT 'active',
-      max_classes      INTEGER NOT NULL DEFAULT 0,
-      max_teachers     INTEGER NOT NULL DEFAULT 0,
-      max_schools      INTEGER NOT NULL DEFAULT 1,
-      trial_started_at TIMESTAMPTZ,
-      trial_ends_at    TIMESTAMPTZ,
-      expires_at       TIMESTAMPTZ,
-      last_payment_at  TIMESTAMPTZ,
-      annual_price     NUMERIC(10,2) NOT NULL DEFAULT 0,
-      first_year_price NUMERIC(10,2) NOT NULL DEFAULT 0,
-      franchise_paid   BOOLEAN NOT NULL DEFAULT TRUE,
-      features_json    TEXT,
-      activated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE TABLE IF NOT EXISTS subscription_history (
-      id              SERIAL PRIMARY KEY,
-      subscription_id INTEGER NOT NULL REFERENCES school_subscriptions(id) ON DELETE CASCADE,
-      event_type      TEXT    NOT NULL,
-      plan_type       TEXT    NOT NULL,
-      amount          NUMERIC(10,2) NOT NULL DEFAULT 0,
-      notes           TEXT,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Push notifications ────────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS push_subscriptions (
-      id           SERIAL PRIMARY KEY,
-      teacher_id   INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
-      subscription TEXT    NOT NULL,
-      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(teacher_id, subscription)
-    )`,
-    // ── Verificação de e-mail ──────────────────────────────────────────────────
-    `CREATE TABLE IF NOT EXISTS email_verification_tokens (
-      id         SERIAL PRIMARY KEY,
-      admin_id   INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
-      token      TEXT    NOT NULL UNIQUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    // ── Colunas OAuth em admins (idempotente via ADD COLUMN IF NOT EXISTS) ────
-    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS email           TEXT`,
-    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS google_id      TEXT`,
-    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS microsoft_id   TEXT`,
-    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS auth_provider  TEXT NOT NULL DEFAULT 'local'`,
-    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE`
-  ];
-
-  for (const sql of stmts) {
-    await _knex.raw(sql);
+  // Verifica conexão testando a tabela principal da app
+  const { error } = await _supabase.from('app_schools').select('id').limit(1);
+  if (error) {
+    const msg = error.message || '';
+    if (msg.includes('does not exist') || error.code === '42P01') {
+      throw new Error(
+        'Tabelas da app não encontradas no Supabase.\n' +
+        'Execute o arquivo supabase/schema.sql no painel Supabase → SQL Editor.'
+      );
+    }
+    throw new Error('Falha ao conectar ao Supabase: ' + msg);
   }
-
-  return _knex;
 }
 
 // ─── Senhas ───────────────────────────────────────────────────────────────────

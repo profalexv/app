@@ -22,6 +22,11 @@
 
 'use strict';
 
+// Carrega .env em desenvolvimento (produção usa variáveis de ambiente do sistema)
+if (process.env.NODE_ENV !== 'production') {
+  try { require('dotenv').config(); } catch (_) { /* dotenv opcional */ }
+}
+
 const express      = require('express');
 const path         = require('path');
 const crypto       = require('crypto');

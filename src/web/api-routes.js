@@ -518,15 +518,15 @@ router.post('/admins/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!isValidCredentials(username, password)) return fail(res, 'Dados inválidos.');
-    const row = await getDb()('admins')
-      .join('schools', 'schools.id', 'admins.school_id')
-      .where('admins.username', username.trim())
-      .select('admins.id', 'admins.name', 'admins.username', 'admins.school_id', 'admins.password', 'schools.name as school_name')
+    const admin = await getDb()('admins')
+      .where({ username: username.trim() })
+      .select('id, name, username, school_id, password')
       .first();
-    if (!row) return fail(res, 'Usuário ou senha incorretos.');
-    const valid = await verifyPassword(password, row.password);
+    if (!admin) return fail(res, 'Usuário ou senha incorretos.');
+    const valid = await verifyPassword(password, admin.password);
     if (!valid) return fail(res, 'Usuário ou senha incorretos.');
-    const { password: _, ...safe } = row;
+    const school = await getDb()('schools').where({ id: admin.school_id }).select('name').first();
+    const { password: _, ...safe } = { ...admin, school_name: school?.name ?? null };
     ok(res, safe);
   } catch (e) { fail(res, e.message, 500); }
 });
@@ -707,13 +707,16 @@ router.put('/lessons/:id', async (req, res) => {
       if (conflict) return fail(res, 'Este recurso já está ocupado neste período.');
     }
     if (teacher_id && schedule_id) {
-      const conflict = await getDb()('lessons as l')
-        .leftJoin('resources as r', 'r.id', 'l.resource_id')
-        .where({ 'l.schedule_id': schedule_id, 'l.teacher_id': teacher_id, 'l.weekday': weekday, 'l.period': period })
-        .whereNot('l.id', id)
-        .select('l.id', 'r.name as resource_name').first();
+      const conflict = await getDb()('lessons')
+        .where({ schedule_id, teacher_id, weekday, period })
+        .whereNot({ id })
+        .select('id, resource_id')
+        .first();
       if (conflict) {
-        const where = conflict.resource_name ? ` (${conflict.resource_name})` : '';
+        const resource = conflict.resource_id
+          ? await getDb()('resources').where({ id: conflict.resource_id }).select('name').first()
+          : null;
+        const where = resource?.name ? ` (${resource.name})` : '';
         return fail(res, `Professor já possui agendamento neste período${where}.`);
       }
     }
@@ -1134,13 +1137,12 @@ router.post('/licenses/activate', async (req, res) => {
     if (!pattern.test(licenseKey?.trim() || ''))
       return fail(res, 'Chave de licença inválida. Formato esperado: AULA-MODULO-XXXX-XXXX-XXXX');
 
-    await getDb().raw(
-      `INSERT INTO licenses (module_id, license_key)
-       VALUES (?, ?)
-       ON CONFLICT (module_id) DO UPDATE
-         SET license_key = EXCLUDED.license_key, activated_at = NOW(), expires_at = NULL`,
-      [moduleId, licenseKey.trim().toUpperCase()]
+    const { error: upsertErr } = await getDb().upsert(
+      'licenses',
+      { module_id: moduleId, license_key: licenseKey.trim().toUpperCase(), expires_at: null },
+      { onConflict: 'module_id' }
     );
+    if (upsertErr) throw new Error(upsertErr.message);
     ok(res);
   } catch (e) { fail(res, e.message, 500); }
 });
@@ -1162,21 +1164,9 @@ router.get('/teachers/:id/lessons', async (req, res) => {
     const teacherId = intParam(req.params.id);
     if (!teacherId) return fail(res, 'Professor ID inválido.');
 
-    const rows = await getDb().raw(`
-      SELECT DISTINCT
-        l.id, l.weekday, l.period,
-        cc.class_id, c.name AS class_name,
-        curr.name AS curriculum_name,
-        l.classroom AS room, l.notes
-      FROM lessons l
-      JOIN class_teacher_curricula ctc ON ctc.teacher_id = l.teacher_id
-      JOIN class_curricula cc          ON ctc.class_curricula_id = cc.id
-      JOIN classes c                   ON cc.class_id = c.id
-      JOIN curricula curr              ON cc.curricula_id = curr.id
-      WHERE l.teacher_id = ?
-      ORDER BY l.weekday, l.period
-    `, [teacherId]);
-    ok(res, rows.rows || []);
+    const { data: rows, error: rpcErr } = await getDb().rpc('app_get_teacher_schedule', { p_teacher_id: teacherId });
+    if (rpcErr) throw new Error(rpcErr.message);
+    ok(res, rows || []);
   } catch (e) { fail(res, 'Erro ao carregar horários: ' + e.message, 500); }
 });
 
@@ -1185,23 +1175,9 @@ router.get('/classes/:id/lessons', async (req, res) => {
     const classId = intParam(req.params.id);
     if (!classId) return fail(res, 'Turma ID inválido.');
 
-    const rows = await getDb().raw(`
-      SELECT
-        l.id, l.weekday, l.period,
-        c.name AS class_name,
-        curr.name AS curriculum_name,
-        t.name AS teacher_name,
-        l.classroom AS room, l.notes
-      FROM lessons l
-      JOIN class_teacher_curricula ctc ON ctc.teacher_id = l.teacher_id
-      JOIN class_curricula cc          ON ctc.class_curricula_id = cc.id
-      JOIN classes c                   ON cc.class_id = c.id
-      JOIN curricula curr              ON cc.curricula_id = curr.id
-      LEFT JOIN teachers t             ON t.id = l.teacher_id
-      WHERE c.id = ?
-      ORDER BY l.weekday, l.period
-    `, [classId]);
-    ok(res, rows.rows || []);
+    const { data: rows, error: rpcErr } = await getDb().rpc('app_get_class_schedule', { p_class_id: classId });
+    if (rpcErr) throw new Error(rpcErr.message);
+    ok(res, rows || []);
   } catch (e) { fail(res, 'Erro ao carregar horários: ' + e.message, 500); }
 });
 
@@ -1209,12 +1185,11 @@ router.get('/schools/:schoolId/classes', async (req, res) => {
   try {
     const schoolId = intParam(req.params.schoolId);
     if (!schoolId) return fail(res, 'Escola ID inválido.');
-    const rows = await getDb()('classes as c')
-      .join('shifts as s', 's.id', 'c.shift_id')
-      .where('c.school_id', schoolId)
-      .orderBy('c.name')
-      .select('c.id', 'c.name', 'c.year', 's.name as shift_name');
-    ok(res, rows);
+    const classes = await getDb()('classes').where({ school_id: schoolId }).orderBy('name').select('id, name, year, shift_id');
+    const shiftIds = [...new Set(classes.filter(c => c.shift_id).map(c => c.shift_id))];
+    const shifts  = shiftIds.length ? await getDb()('shifts').whereIn('id', shiftIds).select('id, name') : [];
+    const shiftMap = Object.fromEntries(shifts.map(s => [s.id, s.name]));
+    ok(res, classes.map(c => ({ ...c, shift_name: shiftMap[c.shift_id] ?? null })));
   } catch (e) { fail(res, 'Erro ao carregar turmas: ' + e.message, 500); }
 });
 
@@ -1253,16 +1228,16 @@ router.get('/bookings/teacher/:teacherId', async (req, res) => {
     const teacherId = intParam(req.params.teacherId);
     if (!teacherId) return fail(res, 'Professor ID inválido.');
 
-    const rows = await getDb()('bookings as b')
-      .join('resources as r', 'r.id', 'b.resource_id')
-      .join('classes as c',   'c.id', 'b.class_id')
-      .where('b.teacher_id', teacherId)
-      .orderBy([{ column: 'b.date', order: 'desc' }, { column: 'b.period', order: 'desc' }])
-      .limit(50)
-      .select('b.id', 'b.resource_id', 'b.class_id', 'b.weekday', 'b.period', 'b.date',
-              'b.description', 'b.status', 'b.created_at',
-              'r.name as resource_name', 'r.type as resource_type', 'c.name as class_name');
-    ok(res, rows);
+    const bookings = await getDb()('bookings').where({ teacher_id: teacherId }).orderBy([{ col: 'date', dir: 'desc' }, { col: 'period', dir: 'desc' }]).limit(50).select('id, resource_id, class_id, weekday, period, date, description, status, created_at');
+    const resIds   = [...new Set(bookings.filter(b => b.resource_id).map(b => b.resource_id))];
+    const clsIds   = [...new Set(bookings.filter(b => b.class_id).map(b => b.class_id))];
+    const [resources, cls] = await Promise.all([
+      resIds.length ? getDb()('resources').whereIn('id', resIds).select('id, name, type') : [],
+      clsIds.length ? getDb()('classes').whereIn('id', clsIds).select('id, name') : [],
+    ]);
+    const resMap = Object.fromEntries(resources.map(r => [r.id, r]));
+    const clsMap = Object.fromEntries(cls.map(c => [c.id, c.name]));
+    ok(res, bookings.map(b => ({ ...b, resource_name: resMap[b.resource_id]?.name ?? null, resource_type: resMap[b.resource_id]?.type ?? null, class_name: clsMap[b.class_id] ?? null })));
   } catch (e) { fail(res, 'Erro ao carregar agendamentos: ' + e.message, 500); }
 });
 
@@ -1291,14 +1266,16 @@ router.get('/resources/:id/schedule', async (req, res) => {
     const resourceId = intParam(req.params.id);
     if (!resourceId) return fail(res, 'Recurso ID inválido.');
 
-    const rows = await getDb()('bookings as b')
-      .leftJoin('teachers as t', 't.id', 'b.teacher_id')
-      .leftJoin('classes as c',  'c.id', 'b.class_id')
-      .where({ 'b.resource_id': resourceId, 'b.status': 'confirmado' })
-      .orderBy(['b.date', 'b.period'])
-      .select('b.id', 'b.weekday', 'b.period', 'b.date', 'b.status', 'b.description',
-              't.name as teacher_name', 'c.name as class_name');
-    ok(res, rows);
+    const bookings = await getDb()('bookings').where({ resource_id: resourceId, status: 'confirmado' }).orderBy([{ col: 'date', dir: 'asc' }, { col: 'period', dir: 'asc' }]).select('id, teacher_id, class_id, weekday, period, date, status, description');
+    const tIds = [...new Set(bookings.filter(b => b.teacher_id).map(b => b.teacher_id))];
+    const cIds = [...new Set(bookings.filter(b => b.class_id).map(b => b.class_id))];
+    const [teachers, cls2] = await Promise.all([
+      tIds.length ? getDb()('teachers').whereIn('id', tIds).select('id, name') : [],
+      cIds.length ? getDb()('classes').whereIn('id', cIds).select('id, name') : [],
+    ]);
+    const tMap = Object.fromEntries(teachers.map(t => [t.id, t.name]));
+    const cMap = Object.fromEntries(cls2.map(c => [c.id, c.name]));
+    ok(res, bookings.map(b => ({ ...b, teacher_name: tMap[b.teacher_id] ?? null, class_name: cMap[b.class_id] ?? null })));
   } catch (e) { fail(res, 'Erro ao carregar schedule: ' + e.message, 500); }
 });
 
