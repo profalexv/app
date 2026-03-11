@@ -1,6 +1,301 @@
-/* ────────────────────────────────────────────────────────────────────────────
-  Tela de Autenticação
-──────────────────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tela de Autenticação — Aula
+───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Wrapper da tela ──────────────────────────────────────────────────────── */
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 20px 16px 80px; /* 80px para não sobrepor banner de cookie */
+}
+.auth-screen.hidden { display: none !important; }
+
+.auth-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #1a2f6e 0%, #2a5298 60%, #1e6fa8 100%);
+  z-index: 0;
+}
+.auth-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+/* ── Marca ────────────────────────────────────────────────────────────────── */
+.auth-brand { text-align: center; color: #fff; }
+.auth-brand-icon { font-size: 44px; line-height: 1; display: block; }
+.auth-brand-name {
+  margin: 8px 0 4px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.auth-brand-sub {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.78;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.auth-card {
+  width: 100%;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 28px 72px rgba(0,0,0,0.38);
+  overflow: hidden;
+}
+
+/* ── Abas ─────────────────────────────────────────────────────────────────── */
+.auth-tabs { display: flex; border-bottom: 1px solid #e6eaf0; }
+.auth-tab {
+  flex: 1;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #8fa3be;
+  cursor: pointer;
+  transition: color 0.2s;
+  position: relative;
+}
+.auth-tab.active {
+  color: #2a5298;
+  box-shadow: inset 0 -2px 0 #2a5298;
+}
+.auth-tab:hover:not(.active) { color: #2c3e50; }
+
+/* ── Painéis de conteúdo ──────────────────────────────────────────────────── */
+.auth-panel { padding: 26px 30px 28px; }
+.auth-panel-hint {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: #5f7b9e;
+  text-align: center;
+  padding: 10px 14px;
+  background: #f0f5ff;
+  border-radius: 8px;
+  border: 1px solid #d4e2f7;
+}
+
+/* ── Formulários ──────────────────────────────────────────────────────────── */
+.auth-form { display: flex; flex-direction: column; }
+.form-group { margin-bottom: 17px; }
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 13px;
+}
+.form-group input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #d8e0ea;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #2c3e50;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  background: #fafbfd;
+}
+.form-group input:focus {
+  outline: none;
+  border-color: #3498db;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(52,152,219,0.13);
+}
+
+/* ── Botão principal ──────────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  text-align: center;
+  text-decoration: none;
+}
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  background: linear-gradient(135deg, #3498db 0%, #2a5298 100%);
+  color: #fff;
+  margin-top: 4px;
+  letter-spacing: 0.2px;
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(42,82,152,0.3);
+}
+.btn-primary:active { transform: none; box-shadow: none; }
+.btn-ghost {
+  background: none;
+  border: 1.5px solid #d8e0ea;
+  color: #5f7b9e;
+  padding: 9px 18px;
+  font-size: 13px;
+}
+.btn-ghost:hover { border-color: #3498db; color: #3498db; }
+
+/* ── Mensagens de erro / sucesso ──────────────────────────────────────────── */
+.auth-error {
+  margin-top: 2px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  background: #fef0f0;
+  border: 1px solid #f5c2c2;
+  border-radius: 8px;
+  color: #c0392b;
+  font-size: 13px;
+  line-height: 1.4;
+  display: none;
+}
+.auth-error.show { display: block; }
+.auth-success-msg {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: #eafaf1;
+  border: 1px solid #a9dfbf;
+  border-radius: 8px;
+  color: #1e8449;
+  font-size: 13px;
+}
+
+/* ── Divisor OAuth ────────────────────────────────────────────────────────── */
+.auth-divider {
+  display: none; /* visível via JS quando há pelo menos um provedor */
+  align-items: center;
+  gap: 10px;
+  margin: 6px 30px 14px;
+  color: #a0b0c5;
+  font-size: 12px;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e6eaf0;
+}
+
+/* ── Botões OAuth ─────────────────────────────────────────────────────────── */
+.auth-oauth-buttons {
+  display: none; /* visível via JS */
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 30px 24px;
+}
+.btn-oauth {
+  display: none; /* cada botão revelado individualmente via JS */
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border: 1.5px solid #d8e0ea;
+  border-radius: 8px;
+  background: #fff;
+  color: #2c3e50;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  cursor: pointer;
+}
+.btn-oauth:hover {
+  border-color: #3498db;
+  box-shadow: 0 2px 8px rgba(52,152,219,0.15);
+  background: #f6fbff;
+}
+
+/* ── Verificação de e-mail ────────────────────────────────────────────────── */
+.auth-verify-box { text-align: center; padding: 8px 8px 4px; }
+.auth-verify-icon { font-size: 52px; display: block; margin-bottom: 14px; }
+.auth-verify-box h3 { margin: 0 0 12px; color: #2c3e50; font-size: 20px; }
+.auth-verify-box p { color: #5f7b9e; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+
+/* ── Loading ──────────────────────────────────────────────────────────────── */
+.auth-loading { text-align: center; padding: 40px 30px; }
+.spinner {
+  border: 3px solid #e6eaf0;
+  border-top-color: #3498db;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.auth-loading p { color: #8fa3be; font-size: 14px; margin: 0; }
+
+/* ── Rodapé do card ───────────────────────────────────────────────────────── */
+.auth-card-footer { text-align: center; }
+.auth-card-footer a {
+  color: rgba(255,255,255,0.75);
+  font-size: 13px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.auth-card-footer a:hover { color: #fff; text-decoration: underline; }
+
+/* ── Banner de cookies (LGPD) ─────────────────────────────────────────────── */
+.cookie-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: rgba(22, 34, 54, 0.97);
+  color: #c8d6e5;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.cookie-banner p { margin: 0; flex: 1; line-height: 1.5; }
+.cookie-banner a { color: #74b9e8; text-decoration: underline; }
+.btn-cookie-accept {
+  background: #3498db;
+  color: #fff;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.btn-cookie-accept:hover { background: #2980b9; }
+
+/* ── Responsivo ───────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .auth-panel { padding: 20px 18px 22px; }
+  .auth-oauth-buttons { padding: 0 18px 20px; }
+  .auth-divider { margin: 4px 18px 12px; }
+  .auth-brand-name { font-size: 28px; }
+  .cookie-banner { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+
 
 .auth-screen {
   position: fixed;

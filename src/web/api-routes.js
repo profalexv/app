@@ -7,9 +7,10 @@
  * Respostas: { success: boolean, data?: any, error?: string }
  */
 
-const express = require('express');
-const crypto  = require('crypto');
-const router  = express.Router();
+const express    = require('express');
+const crypto     = require('crypto');
+const nodemailer = require('nodemailer');
+const router     = express.Router();
 
 const { getDb, hashPassword, verifyPassword } = require('../db/database-web');
 const { isValidCredentials, isValidPositiveInt, isValidTeacherData, isValidSchoolData } = require('../utils/validators');
@@ -28,6 +29,48 @@ function generateToken() { return crypto.randomBytes(32).toString('hex'); }
 function ok(res, data)   { res.json({ success: true, data }); }
 function fail(res, error, status = 400) { res.status(status).json({ success: false, error }); }
 function intParam(v)     { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : null; }
+
+function setSessionCookie(res) {
+  return (token) => {
+    res.cookie('aula_session', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure:   process.env.NODE_ENV === 'production',
+      maxAge:   SESSION_TTL_HOURS * 60 * 60 * 1000,
+    });
+    return token;
+  };
+}
+
+async function sendVerificationEmail(email, name, token) {
+  if (!process.env.SMTP_HOST) return;
+  const transport = nodemailer.createTransport({
+    host:   process.env.SMTP_HOST,
+    port:   parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  await transport.sendMail({
+    from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+    to:      email,
+    subject: 'Confirme seu e-mail — Aula',
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#2a5298">🎓 Aula — Confirme seu e-mail</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Clique no botão abaixo para verificar seu e-mail e ativar sua conta:</p>
+        <p style="text-align:center;margin:32px 0">
+          <a href="${appUrl}/api/auth/verify-email/${token}"
+             style="background:#3498db;color:white;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600">
+            Verificar e-mail
+          </a>
+        </p>
+        <p style="color:#888;font-size:13px">O link expira em 24 horas.<br>Se você não solicitou este cadastro, ignore este e-mail.</p>
+      </div>
+    `,
+  });
+}
 
 // ─── Informações do servidor ────────────────────────────────────────────────
 router.get('/app/dataPath', (req, res) => {
@@ -74,6 +117,101 @@ router.get('/server-endpoints', (req, res) => {
 // AUTENTICAÇÃO
 // ════════════════════════════════════════════════════════════════════════════
 
+// GET /auth/providers — provedores OAuth configurados
+router.get('/auth/providers', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      google:    !!(process.env.GOOGLE_CLIENT_ID    && process.env.GOOGLE_CLIENT_SECRET),
+      microsoft: !!(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET),
+    },
+  });
+});
+
+// GET /auth/me — verifica sessão via cookie httpOnly
+router.get('/auth/me', async (req, res) => {
+  try {
+    const token = req.cookies?.aula_session;
+    if (!token) return res.json({ success: true, authenticated: false });
+
+    await getDb()('admin_sessions')
+      .whereRaw(`created_at < NOW() - INTERVAL '${SESSION_TTL_HOURS} hours'`).del();
+
+    const session = await getDb()('admin_sessions')
+      .where({ token }).select('admin_id', 'school_id').first();
+    if (!session) return res.json({ success: true, authenticated: false });
+
+    const admin = await getDb()('admins')
+      .where({ id: session.admin_id, active: true })
+      .select('id', 'name', 'username', 'email').first();
+    if (!admin) return res.json({ success: true, authenticated: false });
+
+    res.json({
+      success: true,
+      authenticated: true,
+      token,
+      admin: { id: admin.id, name: admin.name, username: admin.username, email: admin.email, role: 'admin', schoolId: session.school_id },
+    });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// POST /auth/register — cadastro por e-mail com verificação
+router.post('/auth/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name?.trim() || !email?.trim() || !password?.trim())
+      return fail(res, 'Nome, e-mail e senha são obrigatórios.');
+    if (password.length < 6)
+      return fail(res, 'Senha deve ter pelo menos 6 caracteres.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      return fail(res, 'E-mail inválido.');
+
+    const school = await getDb()('schools').first();
+    if (!school) return fail(res, 'Nenhuma escola configurada. Configure a escola primeiro.');
+
+    const existing = await getDb()('admins').where({ email: email.trim() }).first();
+    if (existing) return fail(res, 'Este e-mail já está cadastrado.');
+
+    const hashed = await hashPassword(password);
+    let username = email.trim().split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase();
+    let base = username, c = 1;
+    while (await getDb()('admins').where({ username }).select('id').first()) {
+      username = `${base}${c++}`;
+    }
+
+    const [row] = await getDb()('admins').insert({
+      school_id: school.id, name: name.trim(), email: email.trim(), username,
+      password: hashed, auth_provider: 'local', email_verified: false, active: true,
+    }).returning('id');
+    const adminId = row.id ?? row;
+
+    const verifyToken = generateToken();
+    await getDb()('email_verification_tokens').insert({ admin_id: adminId, token: verifyToken });
+
+    sendVerificationEmail(email.trim(), name.trim(), verifyToken)
+      .catch(err => console.warn('[AUTH] Falha ao enviar e-mail de verificação:', err.message));
+
+    ok(res, { requiresVerification: true });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// GET /auth/verify-email/:token — confirma e-mail após clique no link
+router.get('/auth/verify-email/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token?.match(/^[a-f0-9]{64}$/i))
+      return res.redirect('/src/renderer/index.html?auth_error=invalid_token');
+
+    const row = await getDb()('email_verification_tokens').where({ token }).first();
+    if (!row) return res.redirect('/src/renderer/index.html?auth_error=invalid_token');
+
+    await getDb()('admins').where({ id: row.admin_id }).update({ email_verified: true });
+    await getDb()('email_verification_tokens').where({ token }).del();
+
+    res.redirect('/src/renderer/index.html?email_verified=1');
+  } catch (e) { res.redirect('/src/renderer/index.html?auth_error=server'); }
+});
+
 router.get('/auth/checkFirstAdmin/:schoolId', async (req, res) => {
   try {
     const schoolId = intParam(req.params.schoolId);
@@ -94,12 +232,14 @@ router.post('/auth/registerFirstAdmin', async (req, res) => {
 
     const hashed = await hashPassword(password);
     const [row] = await getDb()('admins').insert({
-      school_id: schoolId, name: name.trim(), username: username.trim(), password: hashed, active: true
+      school_id: schoolId, name: name.trim(), username: username.trim(),
+      password: hashed, auth_provider: 'local', email_verified: false, active: true,
     }).returning('id');
     const adminId = row.id ?? row;
 
     const token = generateToken();
     await getDb()('admin_sessions').insert({ school_id: schoolId, admin_id: adminId, token });
+    setSessionCookie(res)(token);
 
     res.json({ success: true, data: { token, admin: { id: adminId, name: name.trim(), username: username.trim(), role: 'admin', schoolId } } });
   } catch (e) {
@@ -112,12 +252,27 @@ router.post('/auth/login', async (req, res) => {
     const { schoolId, username, password } = req.body;
     if (!intParam(schoolId) || !username?.trim() || !password?.trim()) return fail(res, 'Credenciais inválidas.');
 
-    const admin = await getDb()('admins')
-      .where({ school_id: schoolId, username: username.trim() })
-      .select('id', 'name', 'username', 'active', 'password').first();
+    const input = username.trim();
+    let admin;
+
+    if (input.includes('@')) {
+      // Login por e-mail
+      admin = await getDb()('admins')
+        .where({ school_id: schoolId, email: input })
+        .select('id', 'name', 'username', 'email', 'active', 'password', 'email_verified', 'auth_provider').first();
+      if (admin && admin.email_verified === false)
+        return fail(res, 'E-mail não verificado. Cheque sua caixa de entrada.');
+    } else {
+      // Login por usuário (legado)
+      admin = await getDb()('admins')
+        .where({ school_id: schoolId, username: input })
+        .select('id', 'name', 'username', 'email', 'active', 'password', 'email_verified', 'auth_provider').first();
+    }
 
     if (!admin) return fail(res, 'Usuário ou senha incorretos.');
     if (!admin.active) return fail(res, 'Usuário inativo.');
+    if (!admin.password)
+      return fail(res, 'Esta conta usa login externo (Google/Microsoft). Clique no botão correspondente.');
 
     const valid = await verifyPassword(password, admin.password);
     if (!valid) return fail(res, 'Usuário ou senha incorretos.');
@@ -128,8 +283,9 @@ router.post('/auth/login', async (req, res) => {
 
     const token = generateToken();
     await getDb()('admin_sessions').insert({ school_id: schoolId, admin_id: admin.id, token });
+    setSessionCookie(res)(token);
 
-    res.json({ success: true, data: { token, admin: { id: admin.id, name: admin.name, username: admin.username, role: 'admin', schoolId } } });
+    res.json({ success: true, data: { token, admin: { id: admin.id, name: admin.name, username: admin.username, email: admin.email, role: 'admin', schoolId } } });
   } catch (e) { fail(res, e.message, 500); }
 });
 
@@ -158,8 +314,11 @@ router.post('/auth/verifySession', async (req, res) => {
 
 router.post('/auth/logout', async (req, res) => {
   try {
-    const { token } = req.body;
-    if (token?.trim()) await getDb()('admin_sessions').where({ token }).del();
+    const bodyToken  = req.body.token;
+    const cookieToken = req.cookies?.aula_session;
+    const tokens = [...new Set([bodyToken, cookieToken].filter(Boolean))];
+    for (const t of tokens) await getDb()('admin_sessions').where({ token: t }).del();
+    res.clearCookie('aula_session');
     ok(res);
   } catch (e) { fail(res, e.message, 500); }
 });

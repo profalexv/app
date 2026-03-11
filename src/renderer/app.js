@@ -311,6 +311,20 @@ window._esc = function(str) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  // Banner de consentimento de cookies (LGPD)
+  if (!localStorage.getItem('aula_cookies')) {
+    const banner = document.getElementById('cookie-banner');
+    if (banner) {
+      banner.style.display = 'flex';
+      banner.querySelector('#cookie-accept').addEventListener('click', () => {
+        localStorage.setItem('aula_cookies', 'accepted');
+        banner.style.display = 'none';
+      });
+      const policyLink = banner.querySelector('#cookie-policy-link');
+      if (policyLink) policyLink.addEventListener('click', e => e.preventDefault());
+    }
+  }
+
   // Inicializa a detecção automática de servidor (local, VPN ou cloud)
   await window.AppServerDetection.initialize();
 
@@ -348,21 +362,41 @@ async function initializeAuth() {
   if (!schoolId) return;
 
   try {
-    // Cria instância do gerenciador de autenticação
+    // 1. Verificar sessão via cookie httpOnly (sobrevive ao recarregar a página)
+    const meResult = await window.aula.auth.me().catch(() => null);
+    if (meResult?.success && meResult?.authenticated) {
+      window.__authManager = new window.AuthManager();
+      window.__authManager.currentSchool  = schoolId;
+      window.__authManager.token          = meResult.token;
+      window.__authManager.currentAdmin   = meResult.admin;
+      localStorage.setItem(`school_${schoolId}_token`, meResult.token);
+      document.getElementById('auth-screen').classList.add('hidden');
+      setupMainApp();
+      return;
+    }
+
+    // 2. Fallback: verificar token no localStorage
     window.__authManager = new window.AuthManager();
     await window.__authManager.initialize(schoolId);
 
-    const authScreen = document.getElementById('auth-screen');
-    
-    // Verifica se há admin
     const hasAdmin = await window.__authManager.checkFirstAdmin();
 
     if (!window.__authManager.isAuthenticated()) {
-      // Não autenticado
-      showAuthScreen(hasAdmin);
+      window.showAuthScreen(hasAdmin, {
+        onSuccess: () => {
+          document.getElementById('auth-screen').classList.add('hidden');
+          setupMainApp();
+        },
+        onSetupSchool: () => {
+          document.getElementById('auth-screen').classList.add('hidden');
+          window.AppContext.openEditor(async () => {
+            await window.AppContext.load();
+            await initializeAuth();
+          });
+        },
+      });
     } else {
-      // Já autenticado, oculta tela de auth
-      authScreen.classList.add('hidden');
+      document.getElementById('auth-screen').classList.add('hidden');
       setupMainApp();
     }
   } catch (e) {
@@ -373,93 +407,6 @@ async function initializeAuth() {
         <p style="color:var(--color-text-muted);max-width:400px;text-align:center">${e.message}</p>
         <button class="btn btn-primary" onclick="location.reload()">Reiniciar</button>
       </div>`;
-  }
-}
-
-/**
- * Mostra a tela de autenticação (login ou novo admin)
- */
-function showAuthScreen(hasAdmin) {
-  const authScreen = document.getElementById('auth-screen');
-  authScreen.classList.remove('hidden');
-
-  const schoolName = window.AppContext.schoolName;
-  const loginForm = document.getElementById('auth-login-form');
-  const registerForm = document.getElementById('auth-register-form');
-  const loading = document.getElementById('auth-loading');
-
-  // Atualiza nome da escola
-  document.getElementById('auth-school-name').textContent = `- ${schoolName}`;
-
-  // Define qual formulário mostrar
-  if (hasAdmin) {
-    loginForm.style.display = 'block';
-    registerForm.style.display = 'none';
-    setupLoginForm();
-  } else {
-    loginForm.style.display = 'none';
-    registerForm.style.display = 'block';
-    setupRegisterForm();
-  }
-
-  async function setupLoginForm() {
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      loading.style.display = 'block';
-      loginForm.style.display = 'none';
-
-      try {
-        const username = loginForm.querySelector('#auth-login-username').value;
-        const password = loginForm.querySelector('#auth-login-password').value;
-
-        await window.__authManager.login(username, password);
-        
-        // Autenticação bem-sucedida
-        authScreen.classList.add('hidden');
-        setupMainApp();
-      } catch (e) {
-        loading.style.display = 'none';
-        loginForm.style.display = 'block';
-        const errorEl = loginForm.querySelector('#auth-login-error');
-        errorEl.textContent = e.message;
-        errorEl.classList.add('show');
-      }
-    });
-  }
-
-  async function setupRegisterForm() {
-    registerForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      loading.style.display = 'block';
-      registerForm.style.display = 'none';
-
-      try {
-        const name = registerForm.querySelector('#auth-register-name').value;
-        const username = registerForm.querySelector('#auth-register-username').value;
-        const password = registerForm.querySelector('#auth-register-password').value;
-        const passwordConfirm = registerForm.querySelector('#auth-register-password-confirm').value;
-
-        if (password !== passwordConfirm) {
-          throw new Error('As senhas não conferem.');
-        }
-
-        if (password.length < 6) {
-          throw new Error('A senha deve ter pelo menos 6 caracteres.');
-        }
-
-        await window.__authManager.registerFirstAdmin(name, username, password);
-        
-        // Registro bem-sucedido
-        authScreen.classList.add('hidden');
-        setupMainApp();
-      } catch (e) {
-        loading.style.display = 'none';
-        registerForm.style.display = 'block';
-        const errorEl = registerForm.querySelector('#auth-register-error');
-        errorEl.textContent = e.message;
-        errorEl.classList.add('show');
-      }
-    });
   }
 }
 

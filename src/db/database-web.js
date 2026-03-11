@@ -264,7 +264,20 @@ async function setupDatabase() {
       subscription TEXT    NOT NULL,
       created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(teacher_id, subscription)
-    )`
+    )`,
+    // ── Verificação de e-mail ──────────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS email_verification_tokens (
+      id         SERIAL PRIMARY KEY,
+      admin_id   INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+      token      TEXT    NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    // ── Colunas OAuth em admins (idempotente via ADD COLUMN IF NOT EXISTS) ────
+    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS email           TEXT`,
+    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS google_id      TEXT`,
+    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS microsoft_id   TEXT`,
+    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS auth_provider  TEXT NOT NULL DEFAULT 'local'`,
+    `ALTER TABLE admins ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE`
   ];
 
   for (const sql of stmts) {

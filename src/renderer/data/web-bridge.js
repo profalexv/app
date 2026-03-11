@@ -24,7 +24,7 @@
     const token = sessionStorage.getItem('aula_active_token');
     if (token) headers['x-aula-token'] = token;
 
-    const opts = { method, headers };
+    const opts = { method, headers, credentials: 'include' };
     if (body !== null) opts.body = JSON.stringify(body);
 
     const res = await fetch(`${API_BASE}${endpoint}`, opts);
@@ -41,6 +41,8 @@
 
     // ── Autenticação ─────────────────────────────────────────────────────────
     auth: {
+      me: () => get('/auth/me'),
+
       checkFirstAdmin: (schoolId) =>
         get(`/auth/checkFirstAdmin/${schoolId}`),
 

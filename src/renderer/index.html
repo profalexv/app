@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://*:3000 https:">
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://*:3000 https:; img-src 'self' data:">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aula</title>
   <link rel="stylesheet" href="styles/app.css">
@@ -14,8 +14,80 @@
 
   <!-- Tela de Autenticação -->
   <div id="auth-screen" class="auth-screen">
-    <!-- Conteúdo de autenticação será inserido aqui -->
+    <!-- Conteúdo injetado por auth-screen.js -->
   </div>
+
+  <!-- Barra de abas no topo -->
+  <header class="tab-bar" style="display: none;">
+    <div class="app-logo">
+      Aula
+      <span class="app-school-name"></span>
+    </div>
+    <nav class="tabs">
+      <button class="tab-btn active" data-module="cronograma" title="Cronograma de Horários">
+        📅 Cronograma
+      </button>
+      <button class="tab-btn" data-module="aula" title="Registro de Aulas">
+        📝 Aula
+      </button>
+      <button class="tab-btn" data-module="dados" title="Gestão de Dados da Escola">
+        📊 Dados
+      </button>
+      <button class="tab-btn" data-module="usuarios" title="Colaboradores">
+        👷 Colaboradores
+      </button>
+      <div class="tab-bar-spacer"></div>
+      <button class="tab-btn tab-btn-icon" data-module="licencas" title="Gerenciar Licenças">🔑</button>
+    </nav>
+  </header>
+
+  <!-- Área de conteúdo dos módulos -->
+  <main id="app-content" class="app-content" style="display: none;">
+    <!-- Os módulos são carregados aqui dinamicamente -->
+  </main>
+
+  <!-- Toast de notificações -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Banner de consentimento de cookies (LGPD) -->
+  <div id="cookie-banner" class="cookie-banner" style="display:none" role="banner" aria-label="Aviso de cookies">
+    <p>
+      Este site usa cookies essenciais para funcionamento e autenticação.
+      Ao prosseguir, você concorda com o uso de cookies conforme nossa
+      <a href="#" id="cookie-policy-link">política de privacidade</a>.
+    </p>
+    <button id="cookie-accept" class="btn-cookie-accept" type="button">Entendido</button>
+  </div>
+
+  <!-- Ponte web: configura window.aula via HTTP quando não está no Electron -->
+  <script src="data/web-bridge.js"></script>
+
+  <!-- Detecção automática de servidor (local, VPN ou cloud) -->
+  <script src="data/server-detection.js"></script>
+
+  <!-- UI de status de conexão -->
+  <script src="data/connection-status-ui.js"></script>
+
+  <!-- Camada de autenticação -->
+  <script src="modules/auth/auth.js"></script>
+  <script src="modules/auth/auth-screen.js"></script>
+
+  <!-- Camada de dados e licenças (carregados antes dos módulos) -->
+  <script src="data/data-provider.js"></script>
+  <script src="data/license-client.js"></script>
+
+  <!-- Scripts dos módulos -->
+  <script src="modules/cronograma/cronograma.js"></script>
+  <script src="modules/aula/aula.js"></script>
+
+  <!-- Script principal (define window.registerModule antes dos módulos dinâmicos) -->
+  <script src="app.js"></script>
+
+  <!-- Módulos dinâmicos (carregados após app.js para acesso a window.registerModule) -->
+  <script src="modules/usuarios/usuarios.js"></script>
+</body>
+</html>
+
 
   <!-- Barra de abas no topo -->
   <header class="tab-bar" style="display: none;">
