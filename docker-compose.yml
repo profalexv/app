@@ -10,10 +10,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      # AULA_DB_PATH pode ser customizado
-    volumes:
-      - aula-data:/root/.config/aula
-      - aula-backups:/backups
+      DATABASE_URL: ${DATABASE_URL}
+    volumes: []
     restart: unless-stopped
     networks:
       - aula-network
@@ -41,11 +39,7 @@ services:
     profiles:
       - with-nginx
 
-volumes:
-  aula-data:
-    driver: local
-  aula-backups:
-    driver: local
+volumes: {}
 
 networks:
   aula-network:

@@ -88,7 +88,7 @@ class SubscriptionWidget {
           <button class="btn-widget-primary" onclick="window.location.href='modules/subscription/subscription.html'">
             Ver Detalhes
           </button>
-          ${this.subscription.plan_type !== 'cloud' && this.isActive ? 
+          ${!['plus_premium','pro_premium'].includes(this.subscription.plan_type) && this.isActive ? 
             '<button class="btn-widget-secondary" onclick="subscriptionWidget.showQuickUpgrade()">📈 Upgrade</button>' : 
             ''}
         </div>

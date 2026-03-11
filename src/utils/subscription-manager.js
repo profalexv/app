@@ -10,15 +10,19 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const PLANS = {
+  // ── Hospedados (gerenciados pela plataforma) ───────────────────────────────
   free: {
     id: 'free',
-    name: 'Grátis',
-    description: 'Cronograma básico - Sempre grátis',
-    price: { monthly: 0, annual: 0, franchise: 0 },
+    name: 'Free',
+    description: 'Cronograma básico — Sempre grátis',
+    hosted: true,
+    price: { annual: 0, firstYearPrice: 0 },
     trial: null,
     limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
     features: {
       cronograma: true,
+      sugestao_automatica: false,
+      exportacao_pdf: false,
       cadastro_escola: true,
       cadastro_professores: true,
       cadastro_recursos: true,
@@ -33,163 +37,215 @@ const PLANS = {
   starter: {
     id: 'starter',
     name: 'Starter',
-    description: 'Avaliação - Grátis por 1 ano',
-    price: { monthly: 0, annual: 120, franchise: 0 },
-    trial: { duration: 365, durationUnit: 'days' },
+    description: 'Escola pequena — até 5 turmas',
+    hosted: true,
+    price: { annual: 315, firstYearPrice: 189 },
+    trial: { duration: 14, durationUnit: 'days' },
     limits: { schools: 1, classes: 5, teachers: 22, resources: 0 },
     features: {
       cronograma: true,
+      sugestao_automatica: true,
+      exportacao_pdf: true,
       cadastro_escola: true,
       cadastro_professores: true,
       cadastro_recursos: true,
       agendamento_recursos: true,
-      plano_aula: true,
+      plano_aula: false,
       registro_aulas: true,
       relatorios: false,
       backup_cloud: false,
+      suporte_implantacao: true,
       suporte_prioritario: false
     }
   },
-  pro: {
-    id: 'pro',
-    name: 'Pro',
-    description: 'Completo - Hospedagem local',
-    price: { monthly: 0, annual: 320, franchise: 0 },
-    trial: { duration: 180, durationUnit: 'days' },
+  multi: {
+    id: 'multi',
+    name: 'Multi',
+    description: 'Escola média — até 15 turmas',
+    hosted: true,
+    price: { annual: 540, firstYearPrice: 324 },
+    trial: { duration: 14, durationUnit: 'days' },
     limits: { schools: 1, classes: 15, teachers: 60, resources: 0 },
     features: {
       cronograma: true,
+      sugestao_automatica: true,
+      exportacao_pdf: true,
       cadastro_escola: true,
       cadastro_professores: true,
       cadastro_recursos: true,
       agendamento_recursos: true,
-      plano_aula: true,
+      plano_aula: false,
       registro_aulas: true,
-      relatorios: true,
-      backup_local: true,
+      relatorios: false,
       backup_cloud: false,
-      suporte_prioritario: false
+      suporte_prioritario: true
+    }
+  },
+  maxxi: {
+    id: 'maxxi',
+    name: 'Maxxi',
+    description: 'Escola grande — até 35 turmas',
+    hosted: true,
+    price: { annual: 980, firstYearPrice: 588 },
+    trial: { duration: 14, durationUnit: 'days' },
+    limits: { schools: 1, classes: 35, teachers: 90, resources: 0 },
+    features: {
+      cronograma: true,
+      sugestao_automatica: true,
+      exportacao_pdf: true,
+      cadastro_escola: true,
+      cadastro_professores: true,
+      cadastro_recursos: true,
+      agendamento_recursos: true,
+      plano_aula: false,
+      registro_aulas: true,
+      relatorios: false,
+      backup_cloud: false,
+      suporte_dedicado: true,
+      suporte_prioritario: true
     }
   },
   plus: {
     id: 'plus',
     name: 'Plus',
-    description: 'Local premium - Sem limitações de capacidade',
-    price: { monthly: 0, annual: 820, franchise: 0, firstYearDiscount: 0.40, firstYearPrice: 492 },
-    trial: null,
+    description: 'Turmas e professores ilimitados',
+    hosted: true,
+    price: { annual: 1260, firstYearPrice: 756 },
+    trial: { duration: 14, durationUnit: 'days' },
     limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
     features: {
       cronograma: true,
+      sugestao_automatica: true,
+      exportacao_pdf: true,
+      cadastro_escola: true,
+      cadastro_professores: true,
+      cadastro_recursos: true,
+      agendamento_recursos: true,
+      plano_aula: false,
+      registro_aulas: true,
+      relatorios: true,
+      backup_cloud: false,
+      suporte_dedicado: true,
+      suporte_prioritario: true
+    }
+  },
+  plus_premium: {
+    id: 'plus_premium',
+    name: 'Plus Premium',
+    description: 'Plataforma pedagógica completa — ilimitado',
+    hosted: true,
+    price: { annual: 4390, firstYearPrice: 2634 },
+    trial: { duration: 14, durationUnit: 'days' },
+    limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
+    features: {
+      cronograma: true,
+      sugestao_automatica: true,
+      exportacao_pdf: true,
       cadastro_escola: true,
       cadastro_professores: true,
       cadastro_recursos: true,
       agendamento_recursos: true,
       plano_aula: true,
+      editor_planos_bncc: true,
+      registro_aulas: true,
+      relatorios: true,
+      backup_cloud: false,
+      suporte_dedicado: true,
+      suporte_prioritario: true
+    }
+  },
+
+  // ── Auto-hospedados (PRO — dados na infraestrutura do cliente) ─────────────
+  pro: {
+    id: 'pro',
+    name: 'Pro',
+    description: 'Controle total, compliance LGPD — auto-hospedado',
+    hosted: false,
+    price: { annual: 1050, firstYearPrice: 630 },
+    trial: { duration: 14, durationUnit: 'days' },
+    limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
+    features: {
+      cronograma: true,
+      sugestao_automatica: true,
+      exportacao_pdf: true,
+      cadastro_escola: true,
+      cadastro_professores: true,
+      cadastro_recursos: true,
+      agendamento_recursos: true,
+      plano_aula: false,
       registro_aulas: true,
       relatorios: true,
       backup_local: true,
       backup_cloud: false,
-      suporte_prioritario: false,
-      acesso_web: true,
-      acesso_mobile: true,
-      expansao_local: true
+      bd_proprio: true,
+      cloudflare_tunnel: true,
+      compliance_lgpd: true,
+      suporte_prioritario: false
     }
   },
-  cloud: {
-    id: 'cloud',
-    name: 'Cloud',
-    description: 'Instância dedicada em nuvem',
-    price: { monthly: 150, annual: 1800, franchise: 400 },
-    trial: null,
+  pro_premium: {
+    id: 'pro_premium',
+    name: 'Pro Premium',
+    description: 'Plataforma pedagógica + LGPD — auto-hospedado',
+    hosted: false,
+    price: { annual: 4110, firstYearPrice: 2466 },
+    trial: { duration: 14, durationUnit: 'days' },
     limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
     features: {
       cronograma: true,
+      sugestao_automatica: true,
+      exportacao_pdf: true,
       cadastro_escola: true,
       cadastro_professores: true,
       cadastro_recursos: true,
       agendamento_recursos: true,
       plano_aula: true,
+      editor_planos_bncc: true,
       registro_aulas: true,
       relatorios: true,
       backup_local: true,
-      backup_cloud: true,
-      suporte_prioritario: true,
-      espelhamento_local: true,
-      alta_disponibilidade: true,
-      escalabilidade_automatica: true,
-      instancia_dedicada: true,
-      isolamento_total: true,
-      compliance_lgpd: true
-    }
-  },
-  online_basic: {
-    id: 'online_basic',
-    name: 'Online Básico',
-    description: 'Multi-tenant em nuvem (PostgreSQL compartilhado)',
-    price: { monthly: 116.67, annual: 1400, franchise: 0 },
-    trial: null,
-    limits: { schools: 1, classes: 0, teachers: 0, resources: 0 },
-    features: {
-      cronograma: true,
-      cadastro_escola: true,
-      cadastro_professores: true,
-      cadastro_recursos: true,
-      agendamento_recursos: true,
-      plano_aula: true,
-      registro_aulas: true,
-      relatorios: true,
-      backup_cloud: true,
-      suporte_prioritario: false,
-      multi_tenant: true,
-      postgresql: true,
-      acesso_web: true,
-      acesso_mobile: true
-    }
-  },
-  online_premium: {
-    id: 'online_premium',
-    name: 'Online Premium',
-    description: 'Multi-tenant + Plataforma de Planos de Aula ILIMITADA',
-    price: { monthly: 183.33, annual: 2200, franchise: 0 },
-    trial: null,
-    limits: { schools: 1, classes: 0, teachers: 0, resources: 0, lesson_plan_teachers: 0 },
-    features: {
-      cronograma: true,
-      cadastro_escola: true,
-      cadastro_professores: true,
-      cadastro_recursos: true,
-      agendamento_recursos: true,
-      plano_aula: true,
-      registro_aulas: true,
-      relatorios: true,
-      backup_cloud: true,
-      suporte_prioritario: true,
-      multi_tenant: true,
-      postgresql: true,
-      acesso_web: true,
-      acesso_mobile: true,
-      plataforma_planos_ilimitada: true,
-      editor_planos_bncc: true,
-      biblioteca_planos: true,
-      colaboracao_professores: true
+      backup_cloud: false,
+      bd_proprio: true,
+      cloudflare_tunnel: true,
+      compliance_lgpd: true,
+      suporte_prioritario: false
     }
   }
 };
 
+// ADD-ONs: Plataforma de Planos de Aula (adquiridos separadamente)
 const ADD_ONS = {
-  premium_lesson_plans: {
-    id: 'premium_lesson_plans',
-    name: 'Pacote Premium',
-    description: 'Acesso ao editor de planos de aula com biblioteca e templates',
-    price: { annual: 650 },
-    applicablePlans: ['pro', 'plus', 'cloud'],
-    features: {
-      editor_planos_bncc: true,
-      biblioteca_planos: true,
-      colaboracao_professores: true,
-      templates_customizaveis: true,
-      sync_multiplas_turmas: true
-    }
+  addon_planner: {
+    id: 'addon_planner',
+    name: 'Addon Plano — Planner',
+    description: 'Escola no aula.app — até 22 professores',
+    price: { annual: 2210, firstYearPrice: 1326 },
+    applicablePlans: ['free', 'starter', 'maxxi', 'plus', 'pro'],
+    features: { plano_aula: true, editor_planos_bncc: true }
+  },
+  addon_team: {
+    id: 'addon_team',
+    name: 'Addon Plano — Team',
+    description: 'Escola no aula.app — até 60 professores',
+    price: { annual: 3960, firstYearPrice: 2376 },
+    applicablePlans: ['multi', 'maxxi', 'pro'],
+    features: { plano_aula: true, editor_planos_bncc: true }
+  },
+  addon_base: {
+    id: 'addon_base',
+    name: 'Addon Plano — Base',
+    description: 'Professor individual em escola que usa o aula.app',
+    price: { annual: 180, monthly: 20 },
+    applicablePlans: null,
+    features: { plano_aula: true, editor_planos_bncc: true }
+  },
+  addon_superprof: {
+    id: 'addon_superprof',
+    name: 'Addon Plano — Superprof',
+    description: 'Professor individual fora do aula.app',
+    price: { annual: 360, monthly: 40 },
+    applicablePlans: null,
+    features: { plano_aula: true, editor_planos_bncc: true }
   }
 };
 
@@ -226,10 +282,9 @@ class SubscriptionManager {
       max_schools:     plan.limits.schools,
       trial_started_at: plan.trial ? now.toISOString() : null,
       trial_ends_at:   trialEndsAt,
-      monthly_price:   plan.price.monthly,
       annual_price:    plan.price.annual,
-      franchise_fee:   plan.price.franchise,
-      franchise_paid:  planType !== 'cloud',
+      first_year_price: plan.price.firstYearPrice,
+      franchise_paid:  true,
       features_json:   JSON.stringify(plan.features),
       activated_at:    now.toISOString(),
       updated_at:      now.toISOString()
@@ -308,7 +363,6 @@ class SubscriptionManager {
     }
 
     if (['expired', 'cancelled'].includes(subscription.status)) return false;
-    if (subscription.plan_type === 'cloud' && !subscription.franchise_paid) return false;
     if (subscription.expires_at && now > new Date(subscription.expires_at)) return false;
 
     return true;
@@ -361,14 +415,13 @@ class SubscriptionManager {
     const oldSub = await this.db('school_subscriptions').where({ id: subscriptionId }).select('plan_type').first();
 
     await this.db('school_subscriptions').where({ id: subscriptionId }).update({
-      plan_type:     newPlanType,
-      max_classes:   newPlan.limits.classes,
-      max_teachers:  newPlan.limits.teachers,
-      monthly_price: newPlan.price.monthly,
-      annual_price:  newPlan.price.annual,
-      franchise_fee: newPlan.price.franchise,
-      features_json: JSON.stringify(newPlan.features),
-      updated_at:    new Date().toISOString()
+      plan_type:        newPlanType,
+      max_classes:      newPlan.limits.classes,
+      max_teachers:     newPlan.limits.teachers,
+      annual_price:     newPlan.price.annual,
+      first_year_price: newPlan.price.firstYearPrice,
+      features_json:    JSON.stringify(newPlan.features),
+      updated_at:       new Date().toISOString()
     });
 
     await this.addHistoryEvent(subscriptionId, 'plan_upgraded', newPlanType, 0,

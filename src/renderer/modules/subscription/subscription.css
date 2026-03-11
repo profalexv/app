@@ -71,18 +71,28 @@
   color: white;
 }
 
-.plan-badge.cloud {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.plan-badge.multi {
+  background: #2980b9;
   color: white;
 }
 
-.plan-badge.online_basic {
-  background: #16a085;
+.plan-badge.maxxi {
+  background: #8e44ad;
   color: white;
 }
 
-.plan-badge.online_premium {
-  background: #f39c12;
+.plan-badge.plus_premium {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+}
+
+.plan-badge.pro {
+  background: #27ae60;
+  color: white;
+}
+
+.plan-badge.pro_premium {
+  background: linear-gradient(135deg, #27ae60 0%, #1e8449 100%);
   color: white;
 }
 

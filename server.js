@@ -16,9 +16,7 @@
 const express = require('express');
 const path = require('path');
 
-// ─── Inicializa o banco de dados ──────────────────────────────────────────────
-const { setupDatabase, DB_PATH } = require('./src/db/database-web');
-setupDatabase();
+const { setupDatabase } = require('./src/db/database-web');
 
 // ─── Configura o servidor ─────────────────────────────────────────────────────
 const app = express();
@@ -34,17 +32,6 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-aula-token');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
-});
-
-// ─── Rota raiz: página institucional ────────────────────────────────────────
-// Deve vir ANTES do express.static para não ser interceptada pelo index.html.
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'aula', 'index.html'));
-});
-
-// ─── Portal de login ─────────────────────────────────────────────────────────
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'aula', 'login.html'));
 });
 
 // ─── AULA.app (App do Professor) ─────────────────────────────────────────────
@@ -63,15 +50,23 @@ app.use('/api', apiRouter);
 app.use(express.static(path.join(__dirname)));
 
 // ─── Inicia o servidor ────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  const devMode = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
-  console.log('');
-  console.log('╔══════════════════════════════════════════════╗');
-  console.log('║         Aula — Servidor Web                  ║');
-  console.log('╠══════════════════════════════════════════════╣');
-  console.log(`║  URL:    http://localhost:${PORT}                ║`);
-  console.log(`║  Banco:  ${DB_PATH.slice(-38).padEnd(38)}  ║`);
-  console.log(`║  Modo:   ${devMode ? 'desenvolvimento (licenças livres) ' : 'produção                        '}  ║`);
-  console.log('╚══════════════════════════════════════════════╝');
-  console.log('');
+(async () => {
+  await setupDatabase();
+
+  app.listen(PORT, () => {
+    const devMode = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
+    const dbUrl   = (process.env.DATABASE_URL || '').replace(/:([^:@]+)@/, ':***@');
+    console.log('');
+    console.log('╔══════════════════════════════════════════════╗');
+    console.log('║         Aula — Servidor Web                  ║');
+    console.log('╠══════════════════════════════════════════════╣');
+    console.log(`║  URL:    http://localhost:${PORT}                ║`);
+    console.log(`║  Banco:  ${dbUrl.slice(-38).padEnd(38)}  ║`);
+    console.log(`║  Modo:   ${devMode ? 'desenvolvimento (licenças livres) ' : 'produção                        '}  ║`);
+    console.log('╚══════════════════════════════════════════════╝');
+    console.log('');
+  });
+})().catch(err => {
+  console.error('Falha ao inicializar servidor:', err.message);
+  process.exit(1);
 });

@@ -126,23 +126,25 @@ echo ""
 echo -e "${BLUE}📊 Backup Automático (planos PRO — auto-hospedado)${NC}"
 echo "==================================================="
 
-# Cria script de backup do banco local (SQLite — planos PRO)
+# Cria script de backup PostgreSQL
 cat > backup.sh << 'EOF'
 #!/bin/bash
 BACKUP_DIR="/opt/aula/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-DB_PATH="$HOME/.config/aula/aula.db"
 
 mkdir -p $BACKUP_DIR
 
-if [ -f "$DB_PATH" ]; then
-  cp "$DB_PATH" "$BACKUP_DIR/aula-$TIMESTAMP.db"
-  
-  # Remove backups antigos (> 30 dias)
-  find $BACKUP_DIR -name "aula-*.db" -mtime +30 -delete
-  
-  echo "✓ Backup criado: $TIMESTAMP"
+if [ -z "$DATABASE_URL" ]; then
+  echo "❌ DATABASE_URL não definida"
+  exit 1
 fi
+
+pg_dump "$DATABASE_URL" -Fc -f "$BACKUP_DIR/aula-$TIMESTAMP.dump"
+
+# Remove backups antigos (> 30 dias)
+find $BACKUP_DIR -name "aula-*.dump" -mtime +30 -delete
+
+echo "✓ Backup criado: $TIMESTAMP"
 EOF
 
 chmod +x backup.sh

@@ -119,26 +119,25 @@ function renderSubscriptionInfo(subscription, planDetails, isActive) {
 
   // Pricing
   let pricingHTML = '<strong>💰 Valores:</strong><br>';
-  
-  if (planDetails.price.franchise > 0) {
-    pricingHTML += `Franquia: R$ ${planDetails.price.franchise.toFixed(2)} (pode parcelar em 12x)<br>`;
-    pricingHTML += `Mensalidade: R$ ${planDetails.price.monthly.toFixed(2)}/mês<br>`;
-  } else if (planDetails.price.annual > 0) {
+
+  if (planDetails.price.annual > 0) {
     pricingHTML += `Anuidade: R$ ${planDetails.price.annual.toFixed(2)}/ano<br>`;
-  } else if (planDetails.price.monthly > 0) {
-    pricingHTML += `Mensalidade: R$ ${planDetails.price.monthly.toFixed(2)}/mês<br>`;
+    if (planDetails.price.firstYearPrice) {
+      pricingHTML += `<em>1º ano com −40%: R$ ${planDetails.price.firstYearPrice.toFixed(2)}</em><br>`;
+    }
   } else {
     pricingHTML += 'Plano gratuito<br>';
   }
 
   if (planDetails.trial) {
-    pricingHTML += `<em>Período de avaliação: ${planDetails.trial.duration} dias grátis</em>`;
+    pricingHTML += `<em>Trial: ${planDetails.trial.duration} dias grátis (sem cartão)</em>`;
   }
 
   planPricing.innerHTML = pricingHTML;
 
   // Show upgrade button if not on highest plan
-  if (subscription.plan_type !== 'cloud' && isActive) {
+  const topPlans = ['plus_premium', 'pro_premium'];
+  if (!topPlans.includes(subscription.plan_type) && isActive) {
     btnUpgrade.style.display = 'block';
   } else {
     btnUpgrade.style.display = 'none';
@@ -198,33 +197,24 @@ function renderFeatures(planDetails) {
 
   const featureNames = {
     cronograma: '📅 Cronograma',
+    sugestao_automatica: '🧠 Sugestão Automática de Horários',
+    exportacao_pdf: '🖨️ Exportação e Impressão PDF',
     cadastro_escola: '🏫 Cadastro de Escola',
     cadastro_professores: '👨‍🏫 Cadastro de Professores',
     cadastro_recursos: '🏢 Cadastro de Recursos',
     agendamento_recursos: '📆 Agendamento de Recursos',
     plano_aula: '📋 Planos de Aula',
+    editor_planos_bncc: '✏️ Editor de Planos BNCC',
     registro_aulas: '📝 Registro de Aulas',
     relatorios: '📊 Relatórios',
     backup_local: '💾 Backup Local',
     backup_cloud: '☁️ Backup na Nuvem',
-    acesso_web: '🌐 Acesso Web',
-    acesso_mobile: '📱 Acesso Mobile',
-    expansao_local: '🏠 Expansão Local',
-    multi_tenant: '🏢 Multi-tenant',
-    postgresql: '🐘 Banco PostgreSQL',
+    bd_proprio: '🐘 Banco de Dados Próprio (PostgreSQL)',
+    cloudflare_tunnel: '🌐 Acesso via Cloudflare Tunnel',
+    compliance_lgpd: '⚖️ Compliance LGPD',
+    suporte_implantacao: '🤝 Suporte de Implantação',
     suporte_prioritario: '🎯 Suporte Prioritário',
-    espelhamento_local: '🔄 Espelhamento Local',
-    alta_disponibilidade: '⚡ Alta Disponibilidade',
-    escalabilidade_automatica: '📈 Escalabilidade Automática',
-    editor_planos_bncc: '✏️ Editor de Planos BNCC',
-    biblioteca_planos: '📚 Biblioteca de Planos',
-    colaboracao_professores: '👥 Colaboração entre Professores',
-    templates_customizaveis: '🎨 Templates Customizáveis',
-    sync_multiplas_turmas: '🔀 Sincronização Múltiplas Turmas',
-    plataforma_planos_ilimitada: '∞ Plataforma de Planos Ilimitada',
-    instancia_dedicada: '🔒 Instância Dedicada',
-    isolamento_total: '🔐 Isolamento Total',
-    compliance_lgpd: '⚖️ Compliance LGPD'
+    suporte_dedicado: '🏆 Suporte Dedicado'
   };
 
   for (const [key, enabled] of Object.entries(planDetails.features)) {
@@ -260,11 +250,12 @@ function showUpgradeModal() {
   const currentPlanOrder = [
     'free',
     'starter',
-    'pro',
+    'multi',
+    'maxxi',
     'plus',
-    'online_basic',
-    'online_premium',
-    'cloud'
+    'plus_premium',
+    'pro',
+    'pro_premium'
   ];
   const currentIndex = currentPlanOrder.indexOf(currentSubscription.plan_type);
 
@@ -277,10 +268,9 @@ function showUpgradeModal() {
     item.onclick = () => selectPlanForUpgrade(plan);
 
     let priceText = 'Grátis';
-    if (plan.price.franchise > 0) {
-      priceText = `R$ ${plan.price.franchise}/franquia + R$ ${plan.price.monthly}/mês`;
-    } else if (plan.price.annual > 0) {
+    if (plan.price.annual > 0) {
       priceText = `R$ ${plan.price.annual}/ano`;
+      if (plan.price.firstYearPrice) priceText += ` (1º ano R$ ${plan.price.firstYearPrice})`;
     }
 
     item.innerHTML = `

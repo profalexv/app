@@ -85,34 +85,46 @@ class LimitReachedModal {
 
     const suggestions = {
       classes: {
-        free: 'Faça upgrade para o plano Starter e tenha até 5 turmas!',
-        starter: 'Faça upgrade para o plano Pro e tenha até 15 turmas!',
-        pro: 'Faça upgrade para o plano Plus e tenha turmas ilimitadas!',
-        plus: 'Você já está no plano máximo local.',
-        cloud: ''
+        free:        'Faça upgrade para o plano Starter e tenha até 5 turmas!',
+        starter:     'Faça upgrade para o plano Multi e tenha até 15 turmas!',
+        multi:       'Faça upgrade para o plano Maxxi e tenha até 35 turmas!',
+        maxxi:       'Faça upgrade para o plano Plus e tenha turmas ilimitadas!',
+        plus:        'Você já tem turmas ilimitadas neste plano.',
+        plus_premium:'Você já tem turmas ilimitadas neste plano.',
+        pro:         'Você já tem turmas ilimitadas neste plano.',
+        pro_premium: 'Você já tem turmas ilimitadas neste plano.'
       },
       teachers: {
-        free: 'Faça upgrade para o plano Starter e tenha até 22 professores!',
-        starter: 'Faça upgrade para o plano Pro e tenha até 60 professores!',
-        pro: 'Faça upgrade para o plano Plus e tenha professores ilimitados!',
-        plus: 'Você já está no plano máximo local.',
-        cloud: ''
+        free:        'Faça upgrade para o plano Starter e tenha até 22 professores!',
+        starter:     'Faça upgrade para o plano Multi e tenha até 60 professores!',
+        multi:       'Faça upgrade para o plano Maxxi e tenha até 90 professores!',
+        maxxi:       'Faça upgrade para o plano Plus e tenha professores ilimitados!',
+        plus:        'Você já tem professores ilimitados neste plano.',
+        plus_premium:'Você já tem professores ilimitados neste plano.',
+        pro:         'Você já tem professores ilimitados neste plano.',
+        pro_premium: 'Você já tem professores ilimitados neste plano.'
       },
       feature: {
-        free: 'Os planos Starter, Pro e Plus possuem este recurso.',
-        starter: 'Os planos Pro e Plus possuem este recurso.',
-        pro: 'Os planos Plus e Cloud possuem este recurso.',
-        plus: 'O plano Cloud possui todos os recursos.',
-        cloud: ''
+        free:        'Os planos Starter e superiores possuem este recurso.',
+        starter:     'Os planos Multi, Maxxi, Plus e PRO possuem este recurso.',
+        multi:       'Os planos Maxxi, Plus e PRO possuem este recurso.',
+        maxxi:       'Os planos Plus e PRO possuem este recurso.',
+        plus:        'O plano Plus Premium ou PRO Premium possui todos os recursos.',
+        plus_premium:'Você já está no plano com todos os recursos.',
+        pro:         'O plano PRO Premium possui todos os recursos.',
+        pro_premium: 'Você já está no plano com todos os recursos.'
       }
     };
 
     const planNames = {
-      free: 'Grátis',
-      starter: 'Starter',
-      pro: 'Pro',
-      plus: 'Plus',
-      cloud: 'Cloud'
+      free:        'Grátis',
+      starter:     'Starter',
+      multi:       'Multi',
+      maxxi:       'Maxxi',
+      plus:        'Plus',
+      plus_premium:'Plus Premium',
+      pro:         'Pro',
+      pro_premium: 'Pro Premium'
     };
 
     // Update modal content
