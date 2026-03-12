@@ -21,6 +21,7 @@ window.LicenseManager = {
     selfHosted: false,
     trialActive: false,
     trialEndsAt: null,
+    pontoPlan: null,  // null = sem addon ponto; 'mini'|'pronto'|'maximo'|'per_employee' = ativo
   },
 
   /**
@@ -49,23 +50,30 @@ window.LicenseManager = {
    * Verifica se um módulo está acessível para o plano atual.
    * 'cronograma' e 'aula' — disponíveis em todos os planos pagos.
    * 'plano' — apenas PLUS PREMIUM, PRO PREMIUM ou ADDON PLANO ativo.
+   * 'ponto' — apenas se o addon Ponto estiver ativo.
    */
   isLicensed(moduleId) {
     if (moduleId === 'plano') return this._status.lessonPlans === true;
+    if (moduleId === 'ponto') {
+      // Permissivo se ainda não carregou; bloqueia se carregou e não tem addon
+      if (this._status.plan === null) return true;
+      return this._status.pontoPlan !== null;
+    }
     // Se o plano ainda não foi carregado do servidor, permite acesso (permissivo por padrão).
-    // O bloqueio real acontece no backend via SubscriptionManager.
     if (this._status.plan === null) return true;
-    // Demais módulos: disponíveis desde que não seja FREE
     return this._status.plan !== 'free';
   },
 
   /**
    * Exibe mensagem quando módulo está bloqueado pelo plano.
-   * Substitui a antiga chamada a openActivationScreen.
    */
   openActivationScreen(moduleId) {
-    const names = { plano: 'Planos de Aula', cronograma: 'Cronograma', aula: 'Registro de Aulas', usuarios: 'Usuários' };
+    const names = { plano: 'Planos de Aula', cronograma: 'Cronograma', aula: 'Registro de Aulas', usuarios: 'Usuários', ponto: 'Registro de Ponto' };
     const name = names[moduleId] || moduleId;
+    if (moduleId === 'ponto') {
+      if (window.showToast) window.showToast(`O módulo "${name}" é um addon pago. Contrate o addon Ponto para acessar.`, 'warning', 6000);
+      return;
+    }
     if (window.showToast) {
       window.showToast(`O módulo "${name}" não está disponível no seu plano atual. Faça upgrade para acessá-lo.`, 'warning', 5000);
     }

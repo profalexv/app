@@ -179,6 +179,20 @@ class DataProvider {
   // Disponibilidade do Professor
   getTeacherAvailability(personId)        { return this._provider.getTeacherAvailability(personId); }
   setTeacherAvailability(personId, slots) { return this._provider.setTeacherAvailability(personId, slots); }
+
+  // ── Addon Ponto ────────────────────────────────────────────────────────────
+  getPontoStatus(schoolId)          { return this._provider.getPontoStatus(schoolId); }
+  subscribePonto(data)              { return this._provider.subscribePonto(data); }
+  cancelPonto(data)                 { return this._provider.cancelPonto(data); }
+  getPontoEmployees(sid, incDel)    { return this._provider.getPontoEmployees(sid, incDel); }
+  createPontoEmployee(data)         { return this._provider.createPontoEmployee(data); }
+  updatePontoEmployee(id, data)     { return this._provider.updatePontoEmployee(id, data); }
+  deletePontoEmployee(id)           { return this._provider.deletePontoEmployee(id); }
+  getPontoRecords(params)           { return this._provider.getPontoRecords(params); }
+  getPontoToday(schoolId)           { return this._provider.getPontoToday(schoolId); }
+  createPontoRecord(data)           { return this._provider.createPontoRecord(data); }
+  cancelPontoRecord(id, data)       { return this._provider.cancelPontoRecord(id, data); }
+  exportPontoAfd(params)            { return this._provider.exportPontoAfd(params); }
 }
 
 /**

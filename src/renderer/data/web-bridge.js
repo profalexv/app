@@ -204,6 +204,25 @@
 
     // ── Utilitários ───────────────────────────────────────────────────────────
     getAppDataPath: () => get('/app/dataPath').then(r => r.data ?? ''),
+    // ── Addon Ponto ──────────────────────────────────────────────────────────
+    getPontoStatus:     (schoolId) => get(`/ponto/status?schoolId=${schoolId}`),
+    subscribePonto:     (data)     => post('/ponto/subscribe', data),
+    cancelPonto:        (data)     => put('/ponto/subscribe/cancel', data),
+    // Funcionários
+    getPontoEmployees:  (schoolId, includeDeleted = false) =>
+      get(`/ponto/employees?schoolId=${schoolId}&includeDeleted=${includeDeleted}`),
+    createPontoEmployee:(data)     => post('/ponto/employees', data),
+    updatePontoEmployee:(id, data) => put(`/ponto/employees/${id}`, data),
+    // Soft-delete: registros históricos são preservados (CLT / Portaria 671)
+    deletePontoEmployee:(id)       => del(`/ponto/employees/${id}`),
+    // Registros
+    getPontoRecords:    (params)   => get(`/ponto/records?${new URLSearchParams(params).toString()}`),
+    getPontoToday:      (schoolId) => get(`/ponto/today?schoolId=${schoolId}`),
+    createPontoRecord:  (data)     => post('/ponto/records', data),
+    // Cancelamento auditado — NUNCA deletar registros de ponto (CLT Art. 74)
+    cancelPontoRecord:  (id, data) => put(`/ponto/records/${id}/cancel`, data),
+    // Exportação AFD para fiscalização MTP (Portaria 671)
+    exportPontoAfd:     (params)   => get(`/ponto/records/export-afd?${new URLSearchParams(params).toString()}`),
   };
 
   console.log('[web-bridge] window.aula configurado via HTTP →', API_BASE);

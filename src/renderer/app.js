@@ -83,6 +83,7 @@ const MODULES = {
       window.UserManagementModule.init(container, window.AppContext?.schoolId);
     }
   },
+  ponto:    { mount(c) { window.ModulePonto.mount(c); } },
   licencas:   { mount(c) { window.LicenseManager.renderManagementScreen(c); } },
 };
 
@@ -431,6 +432,14 @@ function setupMainApp() {
 
   // Expõe o papel globalmente para os módulos
   window.AppContext.currentUserRole = isAdmin ? 'admin' : 'viewer';
+
+  // Verifica se o addon Ponto está ativo e exibe a aba com botão laranja
+  window.DB.getPontoStatus?.(window.AppContext.schoolId)
+    .then(st => {
+      const pontoTab = document.querySelector('.tab-btn[data-module="ponto"]');
+      if (pontoTab) pontoTab.style.display = st?.active ? '' : 'none';
+    })
+    .catch(() => {});
 
   // Inicia verificação periódica de sessão
   if (window.__authManager) {
