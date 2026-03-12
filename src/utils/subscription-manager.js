@@ -249,6 +249,64 @@ const ADD_ONS = {
   }
 };
 
+// ADD-ON PONTO: Registro de Ponto de Funcionário
+const PONTO_PLANS = {
+  per_employee: {
+    id: 'per_employee',
+    name: 'Por Funcionário',
+    description: 'R$20 para os primeiros 10, R$15 para os próximos 10, R$10 para os demais',
+    maxEmployees: 0,   // ilimitado
+    basePrice: 0,
+    tiers: [
+      { upTo: 10,       pricePerEmployee: 2000 },  // R$20
+      { upTo: 20,       pricePerEmployee: 1500 },  // R$15
+      { upTo: Infinity, pricePerEmployee: 1000 },  // R$10
+    ],
+  },
+  mini: {
+    id: 'mini',
+    name: 'Ponto Mini',
+    description: 'Até 30 funcionários — R$300/mês (R$10 por funcionário extra)',
+    maxEmployees: 30,
+    basePrice: 30000,           // R$300 em centavos
+    extraPricePerEmployee: 1000, // R$10
+  },
+  pronto: {
+    id: 'pronto',
+    name: 'Ponto Pronto',
+    description: 'Até 80 funcionários — R$600/mês (R$10 por funcionário extra)',
+    maxEmployees: 80,
+    basePrice: 60000,
+    extraPricePerEmployee: 1000,
+  },
+  maximo: {
+    id: 'maximo',
+    name: 'Ponto Máximo',
+    description: 'Funcionários ilimitados — R$900/mês',
+    maxEmployees: 0,
+    basePrice: 90000,
+    extraPricePerEmployee: 0,
+  },
+};
+
+/** Calcula o preço mensal do addon Ponto para um número de funcionários */
+function calcPontoPrice(planType, employeeCount) {
+  const plan = PONTO_PLANS[planType];
+  if (!plan) return 0;
+  if (planType === 'per_employee') {
+    let total = 0, remaining = employeeCount;
+    for (const tier of plan.tiers) {
+      if (remaining <= 0) break;
+      const inTier = tier.upTo === Infinity ? remaining : Math.min(remaining, tier.upTo - (employeeCount - remaining));
+      total += inTier * tier.pricePerEmployee;
+      remaining -= inTier;
+    }
+    return total;
+  }
+  const extra = plan.maxEmployees > 0 ? Math.max(0, employeeCount - plan.maxEmployees) : 0;
+  return plan.basePrice + extra * (plan.extraPricePerEmployee || 0);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CLASSE GERENCIADORA
 // ═══════════════════════════════════════════════════════════════════════════

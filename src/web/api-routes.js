@@ -17,9 +17,10 @@ const { isValidCredentials, isValidPositiveInt, isValidTeacherData, isValidSchoo
 const { SubscriptionManager } = require('../utils/subscription-manager');
 
 const AVAILABLE_MODULES = {
-  cronograma: { id: 'cronograma', name: 'Cronograma',        description: 'Criação e gerenciamento de grades de horários escolares.',        icon: '📅' },
-  aula:       { id: 'aula',       name: 'Registro de Aulas', description: 'Registro e controle de aulas ministradas por professor.',          icon: '📝' },
-  plano:      { id: 'plano',      name: 'Plano de Aula',     description: 'Criação e gerenciamento de planos de aula estruturados.',           icon: '📋' },
+  cronograma: { id: 'cronograma', name: 'Cronograma',              description: 'Criação e gerenciamento de grades de horários escolares.',      icon: '📅' },
+  aula:       { id: 'aula',       name: 'Registro de Aulas',       description: 'Registro e controle de aulas ministradas por professor.',        icon: '📝' },
+  plano:      { id: 'plano',      name: 'Plano de Aula',           description: 'Criação e gerenciamento de planos de aula estruturados.',       icon: '📋' },
+  ponto:      { id: 'ponto',      name: 'Registro de Ponto',       description: 'Controle de presença e jornada de funcionários com GPS.',       icon: '🕐' },
 };
 
 const SESSION_TTL_HOURS = 8;
