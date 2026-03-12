@@ -186,15 +186,6 @@ document.getElementById('auth-screen').addEventListener('click', e => {
   btn.classList.toggle('visible');
 });
 
-// ── Botões olhinho (toggle senha) ─────────────────────────────────────────────
-document.querySelectorAll('.btn-eye').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const input = btn.previousElementSibling;
-    input.type = input.type === 'password' ? 'text' : 'password';
-    btn.classList.toggle('visible');
-  });
-});
-
 // ── Troca de abas ──────────────────────────────────────────────────────────────
 _el('auth-tabs').addEventListener('click', e => {
   const btn = e.target.closest('.auth-tab[data-tab]');
