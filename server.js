@@ -41,6 +41,9 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ─── Middlewares globais ──────────────────────────────────────────────────────
+// O webhook do Mercado Pago precisa do body cru (raw) para verificação HMAC.
+// Deve ser registrado ANTES do express.json() global.
+app.use('/api/webhooks/mercadopago', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(cookieParser());
 

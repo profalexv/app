@@ -1394,4 +1394,243 @@ router.get('/subscription/plans', (req, res) => {
   } catch (e) { fail(res, e.message, 500); }
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// MERCADO PAGO — Pagamentos e Webhook
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Preços anuais dos planos (R$).
+ * Planos com desconto de 40% no 1º ano são aplicados na frente-end;
+ * aqui ficam os preços cheios para validação no servidor.
+ */
+const MP_PLAN_PRICES = {
+  free:          0,
+  starter:     315,
+  multi:       540,
+  maxxi:       980,
+  plus:       1260,
+  plus_premium: 4390,
+  pro:         1050,
+  pro_premium: 4110,
+};
+
+/**
+ * Calcula o valor final considerando parcelamento e perfil do pagador.
+ * - Escola, até 5×: sem acréscimo
+ * - Escola, 6–10×:  +10%
+ * - Professor individual, qualquer parcelamento: +10%
+ * - PIX (installments=1, paymentMethod='pix'): -3%
+ */
+function mpCalculateFinalPrice(basePrice, installments, role, paymentMethod) {
+  if (paymentMethod === 'pix') return parseFloat((basePrice * 0.97).toFixed(2));
+  if (role === 'teacher') {
+    return installments > 1 ? parseFloat((basePrice * 1.10).toFixed(2)) : basePrice;
+  }
+  // escola (padrão)
+  return installments > 5 ? parseFloat((basePrice * 1.10).toFixed(2)) : basePrice;
+}
+
+// POST /payments/create-preference — cria preferência de pagamento no MP
+router.post('/payments/create-preference', async (req, res) => {
+  if (!process.env.MERCADOPAGO_ACCESS_TOKEN) {
+    return fail(res, 'Integração com Mercado Pago não configurada. Defina MERCADOPAGO_ACCESS_TOKEN.', 503);
+  }
+
+  try {
+    const { planType, installments = 1, paymentMethod = 'credit_card', schoolId, role = 'school', firstYear = false } = req.body;
+
+    if (!planType || !MP_PLAN_PRICES.hasOwnProperty(planType))
+      return fail(res, `Plano inválido: ${planType}. Planos disponíveis: ${Object.keys(MP_PLAN_PRICES).join(', ')}`);
+
+    let basePrice = MP_PLAN_PRICES[planType];
+    if (basePrice === 0) return fail(res, 'O plano FREE não requer pagamento.');
+
+    // Desconto de 40% no primeiro ano
+    if (firstYear) basePrice = parseFloat((basePrice * 0.60).toFixed(2));
+
+    const finalPrice = mpCalculateFinalPrice(basePrice, installments, role, paymentMethod);
+
+    const { MercadoPagoConfig, Preference } = require('mercadopago');
+    const client = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
+
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const apiUrl = process.env.API_URL || appUrl;
+    const isPublicUrl = !appUrl.includes('localhost') && !appUrl.includes('127.0.0.1');
+
+    const preferenceBody = {
+      items: [{
+        id: planType,
+        title: `aula.app — Plano ${planType.toUpperCase()}${firstYear ? ' (1º ano -40%)' : ''} (anual)`,
+        quantity: 1,
+        unit_price: finalPrice,
+        currency_id: 'BRL',
+      }],
+      payment_methods: {
+        installments: Math.min(Math.max(parseInt(installments) || 1, 1), 10),
+        excluded_payment_types: [],
+      },
+      external_reference: String(schoolId || ''),
+      notification_url: `${apiUrl}/api/webhooks/mercadopago`,
+    };
+
+    // back_urls e auto_return só funcionam com URLs públicas (não localhost)
+    if (isPublicUrl) {
+      preferenceBody.back_urls = {
+        success: `${appUrl}/pagamento/sucesso`,
+        failure: `${appUrl}/pagamento/falha`,
+        pending: `${appUrl}/pagamento/pendente`,
+      };
+      preferenceBody.auto_return = 'approved';
+    }
+
+    const preference = new Preference(client);
+    const mpResponse = await preference.create({ body: preferenceBody });
+
+    ok(res, {
+      preferenceId: mpResponse.id,
+      initPoint: mpResponse.init_point,       // URL para redirecionar o usuário
+      sandboxInitPoint: mpResponse.sandbox_init_point, // URL para testes
+      planType,
+      finalPrice,
+      installments,
+    });
+  } catch (e) {
+    fail(res, `Erro ao criar preferência de pagamento: ${e.message}`, 500);
+  }
+});
+
+// POST /webhooks/mercadopago — recebe notificações do MP e ativa assinatura
+router.post('/webhooks/mercadopago', async (req, res) => {
+  try {
+    // O body chega como Buffer (express.raw registrado no server.js)
+    const rawBody = req.body instanceof Buffer ? req.body.toString('utf8') : JSON.stringify(req.body);
+
+    // ── 1. Verificação HMAC ──────────────────────────────────────────────────
+    const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      const xSignature  = req.headers['x-signature'] || '';
+      const xRequestId  = req.headers['x-request-id'] || '';
+      const dataId      = req.query['data.id'] || '';
+
+      // Formato do manifest conforme documentação MP
+      const tsPart = xSignature.split(',').find(p => p.trim().startsWith('ts='));
+      const ts     = tsPart ? tsPart.split('=')[1] : '';
+      const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+
+      const expectedHash = require('crypto')
+        .createHmac('sha256', webhookSecret)
+        .update(manifest)
+        .digest('hex');
+
+      const v1Part = xSignature.split(',').find(p => p.trim().startsWith('v1='));
+      const receivedHash = v1Part ? v1Part.split('=')[1] : '';
+
+      if (receivedHash && expectedHash !== receivedHash) {
+        return res.status(401).json({ error: 'Assinatura inválida' });
+      }
+    }
+
+    // ── 2. Parsear payload ───────────────────────────────────────────────────
+    let payload;
+    try { payload = JSON.parse(rawBody); } catch { return res.sendStatus(200); }
+
+    const { type, data } = payload;
+    if (type !== 'payment' || !data?.id) return res.sendStatus(200);
+
+    // ── 3. Buscar detalhes do pagamento na API do MP ─────────────────────────
+    if (!process.env.MERCADOPAGO_ACCESS_TOKEN) return res.sendStatus(200);
+
+    const { MercadoPagoConfig, Payment } = require('mercadopago');
+    const client  = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
+    const payment = new Payment(client);
+    const mpPayment = await payment.get({ id: data.id });
+
+    if (mpPayment.status !== 'approved') return res.sendStatus(200);
+
+    const schoolId  = mpPayment.external_reference;
+    const planType  = mpPayment.items?.[0]?.id;
+    const amount    = mpPayment.transaction_amount;
+    const payType   = mpPayment.payment_type_id;
+    const parcel    = mpPayment.installments || 1;
+    const mpId      = String(mpPayment.id);
+
+    if (!schoolId) return res.sendStatus(200);
+
+    const db = getDb();
+
+    // Pagamento já processado? (idempotência)
+    const existing = await db('payments').where({ mercado_pago_id: mpId }).first();
+    if (existing) return res.sendStatus(200);
+
+    // ── 4. Atualizar ou criar assinatura ─────────────────────────────────────
+    const expiresAt = new Date();
+    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    const now = new Date().toISOString();
+
+    const sub = await db('school_subscriptions').where({ school_id: schoolId }).first();
+    let subscriptionId;
+
+    if (sub) {
+      await db('school_subscriptions').where({ school_id: schoolId }).update({
+        status: 'active',
+        ...(planType && MP_PLAN_PRICES.hasOwnProperty(planType) ? { plan_type: planType } : {}),
+        expires_at: expiresAt.toISOString(),
+        last_payment_at: now,
+        updated_at: now,
+      });
+      subscriptionId = sub.id;
+    } else {
+      const [row] = await db('school_subscriptions').insert({
+        school_id: schoolId,
+        plan_type: planType || 'starter',
+        status: 'active',
+        expires_at: expiresAt.toISOString(),
+        last_payment_at: now,
+        created_at: now,
+        updated_at: now,
+      }).returning('id');
+      subscriptionId = row.id ?? row;
+    }
+
+    // ── 5. Registrar pagamento ───────────────────────────────────────────────
+    await db('payments').insert({
+      subscription_id: subscriptionId,
+      mercado_pago_id: mpId,
+      amount,
+      status: 'approved',
+      payment_type: payType,
+      installments: parcel,
+      approved_at: now,
+      created_at: now,
+    });
+
+    res.sendStatus(200);
+  } catch (e) {
+    // Retorna 200 para evitar que o MP fique tentando reenviar
+    console.error('[WEBHOOK MP] Erro ao processar notificação:', e.message);
+    res.sendStatus(200);
+  }
+});
+
+// GET /payments/status/:schoolId — verifica status do pagamento mais recente
+router.get('/payments/status/:schoolId', async (req, res) => {
+  try {
+    const schoolId = intParam(req.params.schoolId);
+    if (!schoolId) return fail(res, 'School ID inválido.');
+
+    const sub = await getDb()('school_subscriptions').where({ school_id: schoolId }).first();
+    if (!sub) return fail(res, 'Assinatura não encontrada.', 404);
+
+    const lastPayment = await getDb()('payments')
+      .where({ subscription_id: sub.id })
+      .orderBy('created_at', 'desc')
+      .first();
+
+    ok(res, {
+      subscription: { status: sub.status, planType: sub.plan_type, expiresAt: sub.expires_at },
+      lastPayment: lastPayment || null,
+    });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
 module.exports = router;
