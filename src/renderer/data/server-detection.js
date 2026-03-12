@@ -43,63 +43,6 @@ class ServerDetector {
     this.cacheExpiry = now + (5 * 60 * 1000);
 
     return webMode;
-    
-    // Cache por 5 minutos se detectou com sucesso
-    if (this.detectionCache && this.cacheExpiry && now < this.cacheExpiry) {
-      return this.detectionCache;
-    }
-
-    const endpoints = [];
-    const timeouts = [];
-
-    // 1️⃣ Tentar servidor local via mDNS
-    const localMdns = await this.testServer('http://aula.local:3000', 'local');
-    if (localMdns) endpoints.push(localMdns);
-    timeouts.push(1000);
-
-    // 2️⃣ Tentar servidor local via IPs (WebRTC discovery)
-    const localIps = await this.getLocalIPs();
-    for (const ip of localIps) {
-      const localIp = await this.testServer(`http://${ip}:3000`, 'local');
-      if (localIp) {
-        endpoints.push(localIp);
-        break; // Encontrou um, próximo tipo
-      }
-    }
-    timeouts.push(500);
-
-    // 3️⃣ Tentar servidor VPN
-    const vpn = await this.testServer('http://10.0.0.1:3000', 'vpn');
-    if (vpn) endpoints.push(vpn);
-    timeouts.push(800);
-
-    // 4️⃣ Fallback para cloud (sempre disponível teoricamente)
-    const cloudUrl = await this.getCloudServerUrl();
-    const cloud = await this.testServer(cloudUrl, 'cloud');
-    if (cloud) endpoints.push(cloud);
-
-    // Ordenar por latência (mais rápido na frente)
-    endpoints.sort((a, b) => a.latency - b.latency);
-
-    this.allEndpoints = endpoints;
-
-    // Usar o mais rápido; se nenhum responder, reportar como desconhecido
-    // (em vez de simular cloud indisponível como se fosse sucesso)
-    const selected = endpoints.length > 0 ? endpoints[0] : {
-      type: 'unknown',
-      url: null,
-      latency: null,
-      priority: 999
-    };
-
-    this.serverType = selected.type;
-    this.serverUrl = selected.url;
-
-    // Cache por 5 minutos
-    this.detectionCache = selected;
-    this.cacheExpiry = now + (5 * 60 * 1000);
-
-    return selected;
   }
 
   /**

@@ -15,15 +15,26 @@ class DataProvider {
   }
 
   /**
-   * Inicializa o provider para o ambiente web (Supabase).
+   * Inicializa o provider para o ambiente web.
+   * Usa window.aula (HTTP → Express) e desempacota { success, data } automaticamente.
    * Chamado uma vez no boot do app.
-   * @param {object} config - { supabaseUrl, supabaseKey }
    */
   init(config = {}) {
-    // TODO: instanciar SupabaseProvider quando implementado
-    // this._provider = new SupabaseProvider(config);
-    // this._mode = 'supabase';
-    throw new Error('[DataProvider] SupabaseProvider ainda não implementado. Veja src/renderer/data/supabase-provider.js.');
+    this._provider = new Proxy(window.aula, {
+      get(target, prop) {
+        const val = target[prop];
+        if (typeof val !== 'function') return val;
+        return async (...args) => {
+          const r = await val.apply(target, args);
+          if (r && typeof r === 'object' && 'success' in r) {
+            if (!r.success) throw new Error(r.error || 'Erro na API');
+            return r.data ?? null;
+          }
+          return r;
+        };
+      }
+    });
+    this._mode = 'api';
   }
 
   get mode() { return this._mode; }
