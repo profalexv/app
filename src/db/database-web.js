@@ -48,8 +48,10 @@ class TableQuery {
     this._cntAlias = 'cnt';
   }
 
-  select(cols = '*') {
-    this._cols = Array.isArray(cols) ? cols.join(', ') : cols;
+  select(...args) {
+    if (args.length === 0) { this._cols = '*'; return this; }
+    const flat = args.flat();
+    this._cols = flat.length === 1 ? flat[0] : flat.join(', ');
     return this;
   }
 

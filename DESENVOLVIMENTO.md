@@ -15,6 +15,7 @@ GitHub/Scholar/
 ```
 
 O **motor** está na pasta irmã (`../motor`), **não dentro deste repositório**.
+O **aula** (landing page) está na pasta irmã (`../aula`), **não dentro deste repositório**.
 
 ---
 
@@ -22,11 +23,11 @@ O **motor** está na pasta irmã (`../motor`), **não dentro deste repositório*
 
 | Componente | Localização | URL |
 |------------|-------------|-----|
-| **Frontend (app)** | Fly.io | `https://aula.app` |
+| **Frontend (app)** | Fly.io | `https://app.alexandre.pro.br` (CNAME) |
 | **Motor (API)** | Fly.io — São Paulo | `https://aula-motor.fly.dev` |
 | **Banco de dados** | Supabase PostgreSQL | `https://rgiaryfatyvsfgqjubmh.supabase.co` |
 | **Webhooks MP** | via motor | `https://aula-motor.fly.dev/api/webhooks/mercadopago` |
-| **Landing page** | GitHub Pages | `https://aula.app` (CNAME) |
+| **Landing page** | GitHub Pages | `https://aula.alexandre.pro.br` (CNAME) |
 
 ---
 

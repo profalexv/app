@@ -658,11 +658,18 @@ router.get('/lessons', async (req, res) => {
   try {
     const scheduleId = intParam(req.query.scheduleId);
     if (!scheduleId) return fail(res, 'scheduleId obrigatório.');
-    const rows = await getDb()('lessons')
-      .leftJoin('teachers', 'teachers.id', 'lessons.teacher_id')
-      .where('lessons.schedule_id', scheduleId)
-      .orderBy(['lessons.weekday', 'lessons.period'])
-      .select('lessons.*', 'teachers.name as teacher_name');
+    const lessons = await getDb()('lessons')
+      .where({ schedule_id: scheduleId })
+      .orderBy('weekday').orderBy('period')
+      .select('id', 'schedule_id', 'resource_id', 'teacher_id', 'weekday', 'period', 'subject', 'classroom', 'notes', 'created_at');
+    // Busca nomes dos professores vinculados para enriquecer a resposta
+    const teacherIds = [...new Set(lessons.map(l => l.teacher_id).filter(Boolean))];
+    const teacherMap = {};
+    if (teacherIds.length) {
+      const teachers = await getDb()('teachers').whereIn('id', teacherIds).select('id', 'name');
+      teachers.forEach(t => { teacherMap[t.id] = t.name; });
+    }
+    const rows = lessons.map(l => ({ ...l, teacher_name: teacherMap[l.teacher_id] ?? null }));
     ok(res, rows);
   } catch (e) { fail(res, e.message, 500); }
 });
@@ -678,12 +685,14 @@ router.post('/lessons', async (req, res) => {
       if (conflict) return fail(res, 'Este recurso já está ocupado neste período.');
     }
     if (teacher_id) {
-      const conflict = await getDb()('lessons as l')
-        .leftJoin('resources as r', 'r.id', 'l.resource_id')
-        .where({ 'l.schedule_id': schedule_id, 'l.teacher_id': teacher_id, 'l.weekday': weekday, 'l.period': period })
-        .select('l.id', 'r.name as resource_name').first();
+      const conflict = await getDb()('lessons')
+        .where({ schedule_id, teacher_id, weekday, period })
+        .select('id', 'resource_id').first();
       if (conflict) {
-        const where = conflict.resource_name ? ` (${conflict.resource_name})` : '';
+        const resource = conflict.resource_id
+          ? await getDb()('resources').where({ id: conflict.resource_id }).select('name').first()
+          : null;
+        const where = resource?.name ? ` (${resource.name})` : '';
         return fail(res, `Professor já possui agendamento neste período${where}.`);
       }
     }

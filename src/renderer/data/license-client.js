@@ -15,7 +15,7 @@
 
 window.LicenseManager = {
   _status: {
-    plan: 'free',
+    plan: null,       // null = ainda não carregado → comportamento permissivo
     addonPlano: false,
     lessonPlans: false,
     selfHosted: false,
@@ -26,7 +26,7 @@ window.LicenseManager = {
   /**
    * Inicializa o status de licença a partir dos dados de sessão.
    * Deve ser chamado após o login bem-sucedido.
-   * @param {object} sessionData - dados retornados pelo endpoint /auth/login
+   * @param {object} sessionData - dados retornados pelo endpoint /auth/login ou /api/license
    */
   load(sessionData = {}) {
     if (sessionData.license) {
@@ -52,8 +52,23 @@ window.LicenseManager = {
    */
   isLicensed(moduleId) {
     if (moduleId === 'plano') return this._status.lessonPlans === true;
+    // Se o plano ainda não foi carregado do servidor, permite acesso (permissivo por padrão).
+    // O bloqueio real acontece no backend via SubscriptionManager.
+    if (this._status.plan === null) return true;
     // Demais módulos: disponíveis desde que não seja FREE
     return this._status.plan !== 'free';
+  },
+
+  /**
+   * Exibe mensagem quando módulo está bloqueado pelo plano.
+   * Substitui a antiga chamada a openActivationScreen.
+   */
+  openActivationScreen(moduleId) {
+    const names = { plano: 'Planos de Aula', cronograma: 'Cronograma', aula: 'Registro de Aulas', usuarios: 'Usuários' };
+    const name = names[moduleId] || moduleId;
+    if (window.showToast) {
+      window.showToast(`O módulo "${name}" não está disponível no seu plano atual. Faça upgrade para acessá-lo.`, 'warning', 5000);
+    }
   },
 
   /**

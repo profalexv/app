@@ -331,9 +331,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Inicializa o data provider
   window.DB.init();
 
-  // Carrega licenças e aplica cadeados nas abas
-  await window.LicenseManager.load();
-
   // Registra cliques nas abas
   document.querySelectorAll('.tab-btn[data-module]').forEach(btn => {
     btn.addEventListener('click', () => window._activateTab(btn.dataset.module));
