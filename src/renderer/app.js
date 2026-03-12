@@ -339,19 +339,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.addEventListener('click', () => window._activateTab(btn.dataset.module));
   });
 
-  // Carrega escola única. Se não existir, abre setup de primeira execução.
-  const hasSchool = await window.AppContext.load();
-  if (!hasSchool) {
-    window.AppContext.openEditor(async () => {
-      await window.AppContext.load();
-      await initializeAuth();
-    });
-    // Renderiza o módulo padrão atrás do modal para contexto visual
-    window._activateTab('cronograma');
-  } else {
-    // Inicializa o sistema de autenticação
-    await initializeAuth();
-  }
+  // Tenta carregar escola existente; independente do resultado, vai para a autenticação.
+  // O editor de escola só abre quando o usuário clica em "Cadastrar minha escola" na tela de login.
+  await window.AppContext.load();
+  await initializeAuth();
 });
 
 /**
@@ -359,7 +350,25 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function initializeAuth() {
   const schoolId = window.AppContext.schoolId;
-  if (!schoolId) return;
+
+  // Se não há escola configurada ainda, mostra a tela de login com a opção de cadastrar.
+  if (!schoolId) {
+    window.__authManager = new window.AuthManager();
+    window.showAuthScreen(true, {
+      onSuccess: () => {
+        document.getElementById('auth-screen').classList.add('hidden');
+        setupMainApp();
+      },
+      onSetupSchool: () => {
+        document.getElementById('auth-screen').classList.add('hidden');
+        window.AppContext.openEditor(async () => {
+          await window.AppContext.load();
+          await initializeAuth();
+        });
+      },
+    });
+    return;
+  }
 
   try {
     // 1. Verificar sessão via cookie httpOnly (sobrevive ao recarregar a página)

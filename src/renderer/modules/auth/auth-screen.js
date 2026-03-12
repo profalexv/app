@@ -38,8 +38,11 @@ document.getElementById('auth-screen').innerHTML = `
           </div>
           <div class="form-group">
             <label for="auth-login-password">Senha</label>
-            <input type="password" id="auth-login-password" name="password"
-              required autocomplete="current-password" placeholder="Sua senha">
+            <div class="input-password-wrap">
+              <input type="password" id="auth-login-password" name="password"
+                required autocomplete="current-password" placeholder="Sua senha">
+              <button type="button" class="btn-eye" aria-label="Mostrar senha" tabindex="-1">👁</button>
+            </div>
           </div>
           <div class="auth-error" id="auth-login-error"></div>
           <button type="submit" class="btn btn-primary" id="auth-login-btn">Entrar</button>
@@ -88,13 +91,19 @@ document.getElementById('auth-screen').innerHTML = `
           </div>
           <div class="form-group">
             <label for="auth-reg-pass">Senha</label>
-            <input type="password" id="auth-reg-pass" name="password"
-              required autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+            <div class="input-password-wrap">
+              <input type="password" id="auth-reg-pass" name="password"
+                required autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+              <button type="button" class="btn-eye" aria-label="Mostrar senha" tabindex="-1">👁</button>
+            </div>
           </div>
           <div class="form-group">
             <label for="auth-reg-pass2">Confirmar senha</label>
-            <input type="password" id="auth-reg-pass2" name="password2"
-              required autocomplete="new-password" placeholder="Repita a senha">
+            <div class="input-password-wrap">
+              <input type="password" id="auth-reg-pass2" name="password2"
+                required autocomplete="new-password" placeholder="Repita a senha">
+              <button type="button" class="btn-eye" aria-label="Mostrar senha" tabindex="-1">👁</button>
+            </div>
           </div>
           <div class="auth-error" id="auth-register-error"></div>
           <button type="submit" class="btn btn-primary" id="auth-register-btn">Criar conta</button>
@@ -119,13 +128,19 @@ document.getElementById('auth-screen').innerHTML = `
           </div>
           <div class="form-group">
             <label for="auth-first-pass">Senha</label>
-            <input type="password" id="auth-first-pass" name="password"
-              required autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+            <div class="input-password-wrap">
+              <input type="password" id="auth-first-pass" name="password"
+                required autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+              <button type="button" class="btn-eye" aria-label="Mostrar senha" tabindex="-1">👁</button>
+            </div>
           </div>
           <div class="form-group">
             <label for="auth-first-pass2">Confirmar senha</label>
-            <input type="password" id="auth-first-pass2" name="password2"
-              required autocomplete="new-password" placeholder="Repita a senha">
+            <div class="input-password-wrap">
+              <input type="password" id="auth-first-pass2" name="password2"
+                required autocomplete="new-password" placeholder="Repita a senha">
+              <button type="button" class="btn-eye" aria-label="Mostrar senha" tabindex="-1">👁</button>
+            </div>
           </div>
           <div class="auth-error" id="auth-first-error"></div>
           <button type="submit" class="btn btn-primary" id="auth-first-btn">Criar administrador</button>
@@ -160,6 +175,25 @@ document.getElementById('auth-screen').innerHTML = `
 
 // ── Referências DOM ────────────────────────────────────────────────────────────
 const _el = id => document.getElementById(id);
+
+// ── Botões olhinho (toggle senha) ──────────────────────────────────────────────
+document.getElementById('auth-screen').addEventListener('click', e => {
+  const btn = e.target.closest('.btn-eye');
+  if (!btn) return;
+  const input = btn.closest('.input-password-wrap')?.querySelector('input');
+  if (!input) return;
+  input.type = input.type === 'password' ? 'text' : 'password';
+  btn.classList.toggle('visible');
+});
+
+// ── Botões olhinho (toggle senha) ─────────────────────────────────────────────
+document.querySelectorAll('.btn-eye').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = btn.previousElementSibling;
+    input.type = input.type === 'password' ? 'text' : 'password';
+    btn.classList.toggle('visible');
+  });
+});
 
 // ── Troca de abas ──────────────────────────────────────────────────────────────
 _el('auth-tabs').addEventListener('click', e => {
