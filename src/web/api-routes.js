@@ -1030,13 +1030,30 @@ router.get('/class-curricula', async (req, res) => {
 
 router.post('/class-curricula', async (req, res) => {
   try {
-    const { class_id, curricula_id } = req.body;
+    const { class_id, curricula_id, weekly_lessons = 0, modalities = [] } = req.body;
     if (!intParam(class_id) || !intParam(curricula_id)) return fail(res, 'Dados inválidos.');
-    const [row] = await getDb()('class_curricula').insert({ class_id, curricula_id }).returning('id');
+    const [row] = await getDb()('class_curricula').insert({
+      class_id, curricula_id,
+      weekly_lessons: parseInt(weekly_lessons) || 0,
+      modalities: JSON.stringify(modalities),
+    }).returning('id');
     ok(res, { id: row.id ?? row });
   } catch (e) {
     fail(res, e.message?.includes('unique') || e.message?.includes('UNIQUE') ? 'Componente já associado à turma.' : e.message);
   }
+});
+
+router.put('/class-curricula/:id', async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    const { weekly_lessons = 0, modalities = [] } = req.body;
+    await getDb()('class_curricula').where({ id }).update({
+      weekly_lessons: parseInt(weekly_lessons) || 0,
+      modalities: JSON.stringify(modalities),
+    });
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
 });
 
 router.delete('/class-curricula/:id', async (req, res) => {
@@ -1639,6 +1656,150 @@ router.get('/payments/status/:schoolId', async (req, res) => {
       subscription: { status: sub.status, planType: sub.plan_type, expiresAt: sub.expires_at },
       lastPayment: lastPayment || null,
     });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// TIPOS DE AULA
+// ════════════════════════════════════════════════════════════════════════════
+
+router.get('/lesson-types', async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId);
+    const q = getDb()('lesson_types').orderBy('name');
+    if (schoolId) q.where({ school_id: schoolId });
+    ok(res, await q);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+router.post('/lesson-types', async (req, res) => {
+  try {
+    const { school_id, name, is_synchronous = 1, color = '#6b7280' } = req.body;
+    if (!intParam(school_id) || !name?.trim()) return fail(res, 'Dados inválidos.');
+    const [row] = await getDb()('lesson_types').insert({
+      school_id, name: name.trim(),
+      is_synchronous: parseInt(is_synchronous),
+      color, active: 1,
+    }).returning('id');
+    ok(res, { id: row.id ?? row });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+router.put('/lesson-types/:id', async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    const fields = {};
+    if (req.body.name !== undefined) fields.name = req.body.name.trim();
+    if (req.body.is_synchronous !== undefined) fields.is_synchronous = parseInt(req.body.is_synchronous);
+    if (req.body.color !== undefined) fields.color = req.body.color;
+    if (req.body.active !== undefined) fields.active = parseInt(req.body.active);
+    if (!Object.keys(fields).length) return fail(res, 'Nenhum campo para atualizar.');
+    await getDb()('lesson_types').where({ id }).update(fields);
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+router.delete('/lesson-types/:id', async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    await getDb()('lesson_types').where({ id }).del();
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// PAPÉIS DE TUTOR
+// ════════════════════════════════════════════════════════════════════════════
+
+router.get('/tutor-roles', async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId);
+    const q = getDb()('tutor_roles').orderBy('name');
+    if (schoolId) q.where({ school_id: schoolId });
+    ok(res, await q);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+router.post('/tutor-roles', async (req, res) => {
+  try {
+    const { school_id, name, color = '#6366f1' } = req.body;
+    if (!intParam(school_id) || !name?.trim()) return fail(res, 'Dados inválidos.');
+    const [row] = await getDb()('tutor_roles').insert({
+      school_id, name: name.trim(), color, active: 1,
+    }).returning('id');
+    ok(res, { id: row.id ?? row });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+router.put('/tutor-roles/:id', async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    const fields = {};
+    if (req.body.name !== undefined) fields.name = req.body.name.trim();
+    if (req.body.color !== undefined) fields.color = req.body.color;
+    if (req.body.active !== undefined) fields.active = parseInt(req.body.active);
+    if (!Object.keys(fields).length) return fail(res, 'Nenhum campo para atualizar.');
+    await getDb()('tutor_roles').where({ id }).update(fields);
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+router.delete('/tutor-roles/:id', async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    await getDb()('tutor_roles').where({ id }).del();
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// TUTORES DE TURMA
+// ════════════════════════════════════════════════════════════════════════════
+
+router.get('/class-tutors', async (req, res) => {
+  try {
+    const classId = intParam(req.query.classId);
+    if (!classId) return fail(res, 'classId obrigatório.');
+    ok(res, await getDb()('class_tutors').where({ class_id: classId }));
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+router.post('/class-tutors', async (req, res) => {
+  try {
+    const { class_id, teacher_id, tutor_role_id } = req.body;
+    if (!intParam(class_id)) return fail(res, 'class_id obrigatório.');
+    const [row] = await getDb()('class_tutors').insert({
+      class_id,
+      teacher_id: intParam(teacher_id) || null,
+      tutor_role_id: intParam(tutor_role_id) || null,
+    }).returning('id');
+    ok(res, { id: row.id ?? row });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+router.put('/class-tutors/:id', async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    const { teacher_id, tutor_role_id } = req.body;
+    await getDb()('class_tutors').where({ id }).update({
+      teacher_id: intParam(teacher_id) || null,
+      tutor_role_id: intParam(tutor_role_id) || null,
+    });
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+router.delete('/class-tutors/:id', async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    await getDb()('class_tutors').where({ id }).del();
+    ok(res);
   } catch (e) { fail(res, e.message, 500); }
 });
 

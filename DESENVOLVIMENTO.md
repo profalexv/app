@@ -9,9 +9,9 @@
 
 ```
 GitHub/Scholar/
-├── app/      ← este repositório (Browser SPA + server.js)
+├── app/      ← este repositório (Browser SPA + server.js) (Faz commit para GitHub Pages repositório app)
 ├── motor/    ← API Node.js/Express (backend)
-└── aula/     ← landing page institucional (GitHub Pages)
+└── aula/     ← landing page institucional (GitHub Pages repositório aula)
 ```
 
 O **motor** está na pasta irmã (`../motor`), **não dentro deste repositório**.
@@ -23,7 +23,7 @@ O **aula** (landing page) está na pasta irmã (`../aula`), **não dentro deste 
 
 | Componente | Localização | URL |
 |------------|-------------|-----|
-| **Frontend (app)** | Fly.io | `https://app.alexandre.pro.br` (CNAME) |
+| **Frontend (app)** | GitHub Pages | `https://app.alexandre.pro.br` (CNAME) |
 | **Motor (API)** | Fly.io — São Paulo | `https://aula-motor.fly.dev` |
 | **Banco de dados** | Supabase PostgreSQL | `https://rgiaryfatyvsfgqjubmh.supabase.co` |
 | **Webhooks MP** | via motor | `https://aula-motor.fly.dev/api/webhooks/mercadopago` |

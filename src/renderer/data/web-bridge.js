@@ -164,6 +164,7 @@
     // ── Grade: Componentes por Turma ──────────────────────────────────────────
     getClassCurricula: (classId) => get(`/class-curricula?classId=${classId}`),
     createClassCurricula: (data) => post('/class-curricula', data),
+    updateClassCurricula: (id, data) => put(`/class-curricula/${id}`, data),
     deleteClassCurricula: (id) => del(`/class-curricula/${id}`),
 
     // ── Professor por Componente e Turma ──────────────────────────────────────
@@ -175,6 +176,26 @@
     getTeacherDays: (teacherId) => get(`/teacher-days/${teacherId}`),
     createTeacherDay: (data) => post('/teacher-days', data),
     deleteTeacherDay: (id) => del(`/teacher-days/${id}`),
+
+    // ── Tipos de Aula ─────────────────────────────────────────────────────────
+    getLessonTypes: (schoolId) => get(`/lesson-types${schoolId ? `?schoolId=${schoolId}` : ''}`),
+    createLessonType: (data) => post('/lesson-types', data),
+    updateLessonType: (id, data) => put(`/lesson-types/${id}`, data),
+    toggleLessonType: (id, active) => put(`/lesson-types/${id}`, { active }),
+    deleteLessonType: (id) => del(`/lesson-types/${id}`),
+
+    // ── Papéis de Tutor ───────────────────────────────────────────────────────
+    getTutorRoles: (schoolId) => get(`/tutor-roles${schoolId ? `?schoolId=${schoolId}` : ''}`),
+    createTutorRole: (data) => post('/tutor-roles', data),
+    updateTutorRole: (id, data) => put(`/tutor-roles/${id}`, data),
+    toggleTutorRole: (id, active) => put(`/tutor-roles/${id}`, { active }),
+    deleteTutorRole: (id) => del(`/tutor-roles/${id}`),
+
+    // ── Tutores de Turma ──────────────────────────────────────────────────────
+    getClassTutors: (classId) => get(`/class-tutors?classId=${classId}`),
+    createClassTutor: (data) => post('/class-tutors', data),
+    updateClassTutor: (id, data) => put(`/class-tutors/${id}`, data),
+    deleteClassTutor: (id) => del(`/class-tutors/${id}`),
 
     // ── Licenças ──────────────────────────────────────────────────────────────
     getModulesStatus: () => get('/licenses/status'),
