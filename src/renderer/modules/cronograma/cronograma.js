@@ -1310,7 +1310,7 @@ window.ModuleCronograma = (() => {
     const html = gradeItems.length === 0
       ? '<p style="color:var(--color-text-muted)">Nenhum componente associado a esta turma.</p>'
       : `<div class="table-wrap"><table>
-          <thead><tr><th>Componente</th><th>Carga Semanal</th><th>Professores</th><th></th></tr></thead>
+          <thead><tr><th>Componente</th><th>Carga Semanal</th><th>Remoto</th><th>Professores</th><th></th></tr></thead>
           <tbody>${gradeItems.map(g => {
             const curr = curricula.find(c => c.id === g.curricula_id);
             const ctcs  = ctcMap[g.curricula_id] || [];
@@ -1327,9 +1327,13 @@ window.ModuleCronograma = (() => {
                   ${ctcs.length > 0 ? '+ Prof' : '+ Atribuir'}
                 </button>
               </div>`;
+            const remoteCell = g.remote_allowed
+              ? `<span title="Trabalho remoto permitido" style="font-size:13px">🌐</span>`
+              : `<span style="color:var(--color-text-muted);font-size:12px">—</span>`;
             return `<tr>
               <td><strong>${curr ? escHtml(curr.name) : '—'}</strong></td>
               <td>${renderModBadges(g.modalities || [])}</td>
+              <td style="text-align:center">${remoteCell}</td>
               <td>${teacherCell}</td>
               <td style="white-space:nowrap">
                 <button class="btn btn-ghost btn-sm" data-edit-grade="${g.id}" title="Editar carga horária">✏️</button>
@@ -1846,6 +1850,7 @@ window.ModuleCronograma = (() => {
     const getModVal = (ltId) => mods.find(m => m.lesson_type_id === ltId)?.weekly_lessons || 0;
     const initTotal = mods.reduce((s, m) => s + (m.weekly_lessons || 0), 0);
     const noTypes = activeLessonTypes.length === 0;
+    const initRemote = !!(existing?.remote_allowed);
 
     document.querySelector('.modal-overlay')?.remove();
     window.openModal({
@@ -1897,6 +1902,16 @@ window.ModuleCronograma = (() => {
             </table>
           </div>`}
         </div>
+        <div class="form-group" style="margin-top:12px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:normal">
+            <input type="checkbox" id="f-remote-allowed" ${initRemote ? 'checked' : ''}
+              style="width:16px;height:16px;cursor:pointer">
+            <span>
+              🌐 <strong>Permitir trabalho remoto</strong>
+              <span style="display:block;font-size:11px;color:var(--color-text-muted);font-weight:normal">O profissional pode cumprir as horas não presenciais em regime de trabalho remoto</span>
+            </span>
+          </label>
+        </div>
         ${!isEdit ? `
         <div class="form-group">
           <label>Professor <span style="color:var(--color-text-muted);font-size:11px">(opcional — pode adicionar mais depois)</span></label>
@@ -1921,14 +1936,15 @@ window.ModuleCronograma = (() => {
           if (ltId && wl > 0) modalities.push({ lesson_type_id: ltId, weekly_lessons: wl });
         });
         const weeklyLessons = modalities.reduce((s, m) => s + m.weekly_lessons, 0);
+        const remoteAllowed = !!(overlay.querySelector('#f-remote-allowed')?.checked);
 
         try {
           if (isEdit) {
-            await window.DB.updateClassCurricula(existing.id, { weekly_lessons: weeklyLessons, modalities });
+            await window.DB.updateClassCurricula(existing.id, { weekly_lessons: weeklyLessons, modalities, remote_allowed: remoteAllowed });
           } else {
             const personId = Number(overlay.querySelector('#f-grade-teacher').value) || null;
             await window.DB.createClassCurricula({ class_id: classId, curricula_id: curriculaId,
-              weekly_lessons: weeklyLessons, modalities });
+              weekly_lessons: weeklyLessons, modalities, remote_allowed: remoteAllowed });
             if (personId) {
               await window.DB.createClassTeacherCurricula({ class_id: classId, curricula_id: curriculaId, person_id: personId });
             }

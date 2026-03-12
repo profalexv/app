@@ -1030,12 +1030,13 @@ router.get('/class-curricula', async (req, res) => {
 
 router.post('/class-curricula', async (req, res) => {
   try {
-    const { class_id, curricula_id, weekly_lessons = 0, modalities = [] } = req.body;
+    const { class_id, curricula_id, weekly_lessons = 0, modalities = [], remote_allowed = false } = req.body;
     if (!intParam(class_id) || !intParam(curricula_id)) return fail(res, 'Dados inválidos.');
     const [row] = await getDb()('class_curricula').insert({
       class_id, curricula_id,
       weekly_lessons: parseInt(weekly_lessons) || 0,
       modalities: JSON.stringify(modalities),
+      remote_allowed: !!remote_allowed,
     }).returning('id');
     ok(res, { id: row.id ?? row });
   } catch (e) {
@@ -1047,10 +1048,11 @@ router.put('/class-curricula/:id', async (req, res) => {
   try {
     const id = intParam(req.params.id);
     if (!id) return fail(res, 'ID inválido.');
-    const { weekly_lessons = 0, modalities = [] } = req.body;
+    const { weekly_lessons = 0, modalities = [], remote_allowed = false } = req.body;
     await getDb()('class_curricula').where({ id }).update({
       weekly_lessons: parseInt(weekly_lessons) || 0,
       modalities: JSON.stringify(modalities),
+      remote_allowed: !!remote_allowed,
     });
     ok(res);
   } catch (e) { fail(res, e.message, 500); }
