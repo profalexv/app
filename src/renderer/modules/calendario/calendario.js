@@ -5,7 +5,7 @@
 
 window.ModuleCalendario = (() => {
   let _schoolId = null;
-  const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const E = window._esc;
 
   const TYPES = {
     feriado:    { label: 'Feriado',    icon: '🏛️', bg: '#fee2e2', color: '#dc2626' },

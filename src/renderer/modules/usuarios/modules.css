@@ -1,0 +1,132 @@
+/*
+ * src/renderer/css/modules.css
+ * Estilos centralizados para os módulos do frontend.
+ */
+
+/* Estilos genéricos para módulos */
+.module-container {
+  padding: 24px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280; /* var(--color-text-muted) */
+}
+
+.error-message {
+  color: #dc2626; /* var(--color-danger) */
+  padding: 20px;
+}
+
+/* Módulo: Substituições */
+.substituicoes-module .page-header {
+  margin-bottom: 20px;
+}
+
+.substituicoes-module .page-header .page-title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.substituicoes-module .filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.substituicoes-module .filter-bar label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.substituicoes-module .filter-bar .form-control {
+  width: 160px;
+}
+
+.sub-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  border-left: 4px solid var(--status-color, #6b7280);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.sub-card-info {
+  flex: 1;
+}
+
+.sub-card-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sub-card-header .date-info {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.sub-card-subject {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sub-card-teachers {
+  font-size: 13px;
+  color: #374151;
+  margin-top: 4px;
+}
+
+.sub-card-teachers .substitute-pending {
+  color: #dc2626;
+}
+
+.sub-card-meta {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.sub-card-notes {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.sub-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Módulo: Dashboard */
+.dashboard-module .page-header {
+  margin-bottom: 24px;
+}
+
+.dashboard-grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.dash-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  min-width: 0;
+  border-left: 4px solid var(--card-color, #3B6FD4);
+}

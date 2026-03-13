@@ -6,7 +6,7 @@
 window.ModuleDashboard = (() => {
   let _schoolId = null;
 
-  const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const E = window._esc;
 
   const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   const CALENDAR_COLORS = {
@@ -25,11 +25,11 @@ window.ModuleDashboard = (() => {
 
   function render() {
     return `
-      <div class="dashboard-module" style="padding:24px;overflow-y:auto;height:100%">
-        <div class="page-header" style="margin-bottom:24px">
+      <div class="dashboard-module module-container">
+        <div class="page-header">
           <div>
-            <h1 style="margin:0;font-size:22px">📊 Dashboard</h1>
-            <p class="subtitle" style="margin:4px 0 0">Visão geral da escola</p>
+            <h1>📊 Dashboard</h1>
+            <p class="subtitle">Visão geral da escola</p>
           </div>
           <button class="btn btn-ghost" id="dash-refresh" title="Atualizar">↻ Atualizar</button>
         </div>
@@ -52,98 +52,77 @@ window.ModuleDashboard = (() => {
     ];
 
     const cardsHtml = cards.map(c => `
-      <div class="dash-card" style="
-        background:#fff;border-radius:12px;padding:20px;
-        border-left:4px solid ${c.color};
-        box-shadow:0 1px 3px rgba(0,0,0,.08);
-        min-width:0;
-      ">
-        <div style="font-size:28px;margin-bottom:8px">${c.icon}</div>
-        <div style="font-size:32px;font-weight:700;color:${c.color}">${c.value}</div>
-        <div style="font-weight:600;font-size:13px">${c.label}</div>
-        <div style="color:#6b7280;font-size:12px;margin-top:2px">${c.sub}</div>
+      <div class="dash-card" style="--card-color: ${c.color}">
+        <div class="card-icon">${c.icon}</div>
+        <div class="card-value">${c.value}</div>
+        <div class="card-label">${c.label}</div>
+        <div class="card-sub-label">${c.sub}</div>
       </div>
     `).join('');
 
     const teacherLoadHtml = teacherLoad.length
       ? teacherLoad.map((t, i) => {
           const max = teacherLoad[0].lessons || 1;
-          const pct = Math.round((t.lessons / max) * 100);
+          const pct = Math.min(100, Math.round((t.lessons / max) * 100));
           return `
-            <div style="margin-bottom:12px">
-              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                <span style="font-size:13px;font-weight:500">${E(t.name)}</span>
-                <span style="font-size:12px;color:#6b7280">${t.lessons} aulas/sem.</span>
+            <div class="teacher-load-item">
+              <div class="item-header">
+                <span class="name">${E(t.name)}</span>
+                <span class="lessons">${t.lessons} aulas/sem.</span>
               </div>
-              <div style="height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden">
-                <div style="height:100%;width:${pct}%;background:#3B6FD4;border-radius:4px;transition:width .3s"></div>
+              <div class="progress-bar-bg">
+                <div class="progress-bar" style="width:${pct}%"></div>
               </div>
             </div>
           `;
         }).join('')
-      : '<p style="color:#6b7280;font-size:13px">Nenhum dado de carga disponível.</p>';
+      : '<p class="empty-state" style="padding: 10px 0;">Nenhum dado de carga disponível.</p>';
 
     const subsHtml = pendingSubstitutions.length
       ? pendingSubstitutions.map(s => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0">
-            <div>
-              <div style="font-size:13px;font-weight:500">${E(s.subject) || 'Sem disciplina'}</div>
-              <div style="font-size:12px;color:#6b7280">${s.date}</div>
-            </div>
-            <span style="font-size:11px;background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:12px">Pendente</span>
-          </div>
+          <div class="list-item">...</div>
         `).join('')
-      : '<p style="color:#6b7280;font-size:13px">Sem substituições pendentes. ✓</p>';
+      : '<p class="empty-state" style="padding: 10px 0;">Sem substituições pendentes. ✓</p>';
 
     const eventsHtml = upcomingEvents.length
       ? upcomingEvents.map(ev => `
-          <div style="display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #f0f0f0">
-            <div style="white-space:nowrap;font-size:12px;color:#6b7280;min-width:80px">${ev.date}</div>
-            <div style="flex:1;min-width:0">
-              ${typeBadge(ev.type)}
-              <div style="font-size:13px;font-weight:500;margin-top:4px">${E(ev.title)}</div>
-            </div>
-          </div>
+          <div class="list-item">...</div>
         `).join('')
-      : '<p style="color:#6b7280;font-size:13px">Sem eventos próximos.</p>';
+      : '<p class="empty-state" style="padding: 10px 0;">Sem eventos próximos.</p>';
 
     const activityHtml = recentActivity.length
       ? recentActivity.map(a => `
-          <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:12px">
-            <span style="color:#6b7280;white-space:nowrap">${new Date(a.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
-            <span style="font-weight:500">${E(a.action)}</span>
-            <span style="color:#6b7280">${E(a.entity)}</span>
-          </div>
+          <div class="list-item-sm">...</div>
         `).join('')
-      : '<p style="color:#6b7280;font-size:13px">Nenhuma atividade recente.</p>';
+      : '<p class="empty-state" style="padding: 10px 0;">Nenhuma atividade recente.</p>';
 
     return `
       <!-- Cards resumo -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:24px">
+      <div class="dashboard-grid-cards">
         ${cardsHtml}
       </div>
 
       <!-- Linha 2: carga + substituições + próximos eventos -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
-        <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)">
-          <h3 style="margin:0 0 16px;font-size:15px">📊 Carga por Professor</h3>
+      <div class="dashboard-grid-main">
+        <div class="dash-panel">
+          <h3 class="panel-title">📊 Carga por Professor</h3>
           ${teacherLoadHtml}
         </div>
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);flex:1">
-            <h3 style="margin:0 0 12px;font-size:15px">⚠️ Substituições Pendentes</h3>
+        <div class="dash-panel-group">
+          <div class="dash-panel">
+            <h3 class="panel-title">⚠️ Substituições Pendentes</h3>
             ${subsHtml}
           </div>
-          <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);flex:1">
-            <h3 style="margin:0 0 12px;font-size:15px">📆 Próximos Eventos</h3>
+          <div class="dash-panel">
+            <h3 class="panel-title">📆 Próximos Eventos</h3>
             ${eventsHtml}
           </div>
         </div>
       </div>
 
       <!-- Atividade recente -->
-      <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)">
-        <h3 style="margin:0 0 12px;font-size:15px">🔍 Atividade Recente (Auditoria)</h3>
+      <div class="dash-panel">
+        <h3 class="panel-title">🔍 Atividade Recente (Auditoria)</h3>
         ${activityHtml}
       </div>
     `;
@@ -159,7 +138,7 @@ window.ModuleDashboard = (() => {
         const data = await window.aula.getDashboard(_schoolId);
         content.innerHTML = renderContent(data);
       } catch (e) {
-        content.innerHTML = `<div style="text-align:center;padding:40px;color:#dc2626">Erro ao carregar dashboard: ${E(e.message)}</div>`;
+        content.innerHTML = `<div class="error-message" style="text-align:center">Erro ao carregar dashboard: ${E(e.message)}</div>`;
       }
     }
 

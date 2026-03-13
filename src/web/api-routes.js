@@ -16,11 +16,21 @@ const router     = express.Router();
 const { getDb, hashPassword, verifyPassword } = require('../db/database-web');
 const { isValidCredentials, isValidPositiveInt, isValidTeacherData, isValidSchoolData } = require('../utils/validators');
 const { SubscriptionManager } = require('../utils/subscription-manager');
+const { ok, fail, intParam } = require('./routes/route-helpers');
 
 // Importando roteadores de entidades específicas
 const peopleRoutes = require('./routes/people.routes');
 const teacherRoutes = require('./routes/teachers.routes');
 const scheduleRoutes = require('./routes/schedules.routes');
+const lessonRoutes = require('./routes/lessons.routes');
+const resourceRoutes = require('./routes/resources.routes');
+const classRoutes = require('./routes/classes.routes');
+const shiftRoutes = require('./routes/shifts.routes');
+const curriculaRoutes = require('./routes/curricula.routes');
+const timeSlotRoutes = require('./routes/time-slots.routes');
+const classCurriculaRoutes = require('./routes/class-curricula.routes');
+const classTeacherCurriculaRoutes = require('./routes/class-teacher-curricula.routes');
+const teacherDaysRoutes = require('./routes/teacher-days.routes');
 
 const AVAILABLE_MODULES = {
   cronograma: { id: 'cronograma', name: 'Cronograma',              description: 'Criação e gerenciamento de grades de horários escolares.',      icon: '📅' },
@@ -31,11 +41,6 @@ const AVAILABLE_MODULES = {
 
 const SESSION_TTL_HOURS = 8;
 const DEV_MODE = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
-
-function generateToken() { return crypto.randomBytes(32).toString('hex'); }
-function ok(res, data)   { res.json({ success: true, data }); }
-function fail(res, error, status = 400) { res.status(status).json({ success: false, error }); }
-function intParam(v)     { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : null; }
 
 // ─── Rate limiting — login/registro ──────────────────────────────────────────
 const authLimiter = rateLimit({
@@ -82,6 +87,8 @@ function setSessionCookie(res) {
   };
 }
 
+function generateToken() { return crypto.randomBytes(32).toString('hex'); }
+
 async function sendVerificationEmail(email, name, token) {
   if (!process.env.SMTP_HOST) return;
   const transport = nodemailer.createTransport({
@@ -123,6 +130,15 @@ router.use(PROTECTED_ROUTE_GROUPS, requireAuth);
 router.use('/people', peopleRoutes);
 router.use('/teachers', teacherRoutes);
 router.use('/schedules', scheduleRoutes);
+router.use('/lessons', lessonRoutes);
+router.use('/resources', resourceRoutes);
+router.use('/classes', classRoutes);
+router.use('/shifts', shiftRoutes);
+router.use('/curricula', curriculaRoutes);
+router.use('/time-slots', timeSlotRoutes);
+router.use('/class-curricula', classCurriculaRoutes);
+router.use('/class-teacher-curricula', classTeacherCurriculaRoutes);
+router.use('/teacher-days', teacherDaysRoutes);
 
 // ─── Informações do servidor ─────────────────────────────────────────────────
 router.get('/app/dataPath', (req, res) => {
@@ -595,96 +611,6 @@ router.post('/admins/login', async (req, res) => {
 // AULAS
 // ════════════════════════════════════════════════════════════════════════════
 
-router.get('/lessons', async (req, res) => {
-  try {
-    const scheduleId = intParam(req.query.scheduleId);
-    if (!scheduleId) return fail(res, 'scheduleId obrigatório.');
-    const lessons = await getDb()('lessons')
-      .where({ schedule_id: scheduleId })
-      .orderBy('weekday').orderBy('period')
-      .select('id', 'schedule_id', 'resource_id', 'teacher_id', 'weekday', 'period', 'subject', 'classroom', 'notes', 'created_at');
-    // Busca nomes dos professores vinculados para enriquecer a resposta
-    const teacherIds = [...new Set(lessons.map(l => l.teacher_id).filter(Boolean))];
-    const teacherMap = {};
-    if (teacherIds.length) {
-      const teachers = await getDb()('teachers').whereIn('id', teacherIds).select('id', 'name');
-      teachers.forEach(t => { teacherMap[t.id] = t.name; });
-    }
-    const rows = lessons.map(l => ({ ...l, teacher_name: teacherMap[l.teacher_id] ?? null }));
-    ok(res, rows);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/lessons', async (req, res) => {
-  try {
-    const { schedule_id, resource_id = null, teacher_id = null, weekday, period, subject, classroom = '', notes = '' } = req.body;
-    if (!intParam(schedule_id) || !intParam(weekday) || !intParam(period) || !subject?.trim())
-      return fail(res, 'Dados inválidos.');
-
-    if (resource_id) {
-      const conflict = await getDb()('lessons').where({ schedule_id, resource_id, weekday, period }).select('id').first();
-      if (conflict) return fail(res, 'Este recurso já está ocupado neste período.');
-    }
-    if (teacher_id) {
-      const conflict = await getDb()('lessons')
-        .where({ schedule_id, teacher_id, weekday, period })
-        .select('id', 'resource_id').first();
-      if (conflict) {
-        const resource = conflict.resource_id
-          ? await getDb()('resources').where({ id: conflict.resource_id }).select('name').first()
-          : null;
-        const where = resource?.name ? ` (${resource.name})` : '';
-        return fail(res, `Professor já possui agendamento neste período${where}.`);
-      }
-    }
-
-    const [row] = await getDb()('lessons').insert({
-      schedule_id, resource_id, teacher_id, weekday, period,
-      subject: subject.trim(), classroom: classroom.trim(), notes
-    }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) { fail(res, e.message); }
-});
-
-router.put('/lessons/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    const { schedule_id, resource_id = null, teacher_id = null, weekday, period, subject, classroom = '', notes = '' } = req.body;
-    if (!id || !intParam(weekday) || !intParam(period) || !subject?.trim()) return fail(res, 'Dados inválidos.');
-
-    if (resource_id && schedule_id) {
-      const conflict = await getDb()('lessons').where({ schedule_id, resource_id, weekday, period }).whereNot({ id }).select('id').first();
-      if (conflict) return fail(res, 'Este recurso já está ocupado neste período.');
-    }
-    if (teacher_id && schedule_id) {
-      const conflict = await getDb()('lessons')
-        .where({ schedule_id, teacher_id, weekday, period })
-        .whereNot({ id })
-        .select('id, resource_id')
-        .first();
-      if (conflict) {
-        const resource = conflict.resource_id
-          ? await getDb()('resources').where({ id: conflict.resource_id }).select('name').first()
-          : null;
-        const where = resource?.name ? ` (${resource.name})` : '';
-        return fail(res, `Professor já possui agendamento neste período${where}.`);
-      }
-    }
-
-    await getDb()('lessons').where({ id }).update({ teacher_id, weekday, period, subject: subject.trim(), classroom: classroom.trim(), notes });
-    ok(res);
-  } catch (e) { fail(res, e.message); }
-});
-
-router.delete('/lessons/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('lessons').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
 // ════════════════════════════════════════════════════════════════════════════
 // PLANOS DE AULA
 // ════════════════════════════════════════════════════════════════════════════
@@ -747,330 +673,29 @@ router.delete('/lesson-plans/:id', async (req, res) => {
 // RECURSOS
 // ════════════════════════════════════════════════════════════════════════════
 
-router.get('/resources', async (req, res) => {
-  try {
-    const schoolId = intParam(req.query.schoolId);
-    const q = getDb()('resources').orderBy('name');
-    if (schoolId) q.where({ school_id: schoolId });
-    ok(res, await q);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/resources', async (req, res) => {
-  try {
-    const { school_id, name, type, capacity = null, description = '' } = req.body;
-    if (!intParam(school_id) || !name?.trim() || !type?.trim()) return fail(res, 'Dados inválidos.');
-    const [row] = await getDb()('resources').insert({
-      school_id, name: name.trim(), type: type.trim(), capacity, description: description.trim()
-    }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.put('/resources/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    const { name, type, capacity, description } = req.body;
-    if (!id || !name?.trim() || !type?.trim()) return fail(res, 'Dados inválidos.');
-    await getDb()('resources').where({ id }).update({ name: name.trim(), type: type.trim(), capacity, description: description?.trim() || '' });
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.delete('/resources/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('resources').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
 // ════════════════════════════════════════════════════════════════════════════
 // TURNOS
 // ════════════════════════════════════════════════════════════════════════════
-
-router.get('/shifts', async (req, res) => {
-  try {
-    const schoolId = intParam(req.query.schoolId);
-    const q = getDb()('shifts').orderBy('name');
-    if (schoolId) q.where({ school_id: schoolId });
-    ok(res, await q);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/shifts', async (req, res) => {
-  try {
-    const { school_id, name } = req.body;
-    if (!intParam(school_id) || !name?.trim()) return fail(res, 'Dados inválidos.');
-    const [row] = await getDb()('shifts').insert({ school_id, name: name.trim() }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.put('/shifts/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    const { name } = req.body;
-    if (!id || !name?.trim()) return fail(res, 'Dados inválidos.');
-    await getDb()('shifts').where({ id }).update({ name: name.trim() });
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.delete('/shifts/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('shifts').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-// TURMAS
-// ════════════════════════════════════════════════════════════════════════════
-
-router.get('/classes', async (req, res) => {
-  try {
-    const schoolId = intParam(req.query.schoolId);
-    const q = getDb()('classes').orderBy('name');
-    if (schoolId) q.where({ school_id: schoolId });
-    ok(res, await q);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/classes', async (req, res) => {
-  try {
-    const { school_id, shift_id, name, year } = req.body;
-    if (!intParam(school_id) || !intParam(shift_id) || !name?.trim()) return fail(res, 'Dados inválidos.');
-
-    const sm = new SubscriptionManager(getDb());
-    const check = await sm.canCreateClass(school_id);
-    if (!check.allowed) return fail(res, check.reason, 403);
-
-    const [row] = await getDb()('classes').insert({ school_id, shift_id, name: name.trim(), year }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.put('/classes/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    const { name, year } = req.body;
-    if (!id || !name?.trim()) return fail(res, 'Dados inválidos.');
-    await getDb()('classes').where({ id }).update({ name: name.trim(), year });
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.delete('/classes/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('classes').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTES CURRICULARES
 // ════════════════════════════════════════════════════════════════════════════
 
-router.get('/curricula', async (req, res) => {
-  try {
-    const schoolId = intParam(req.query.schoolId);
-    const q = getDb()('curricula').orderBy('name');
-    if (schoolId) q.where({ school_id: schoolId });
-    ok(res, await q);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/curricula', async (req, res) => {
-  try {
-    const { school_id, name, code = '', description = '' } = req.body;
-    if (!intParam(school_id) || !name?.trim()) return fail(res, 'Dados inválidos.');
-    const [row] = await getDb()('curricula').insert({
-      school_id, name: name.trim(), code: code.trim(), description: description.trim()
-    }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.put('/curricula/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    const { name, code, description } = req.body;
-    if (!id || !name?.trim()) return fail(res, 'Dados inválidos.');
-    await getDb()('curricula').where({ id }).update({ name: name.trim(), code: code?.trim() || '', description: description?.trim() || '' });
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.delete('/curricula/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('curricula').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
 // ════════════════════════════════════════════════════════════════════════════
 // HORÁRIOS (TIME SLOTS)
 // ════════════════════════════════════════════════════════════════════════════
-
-router.get('/time-slots', async (req, res) => {
-  try {
-    const shiftId = intParam(req.query.shiftId);
-    const q = getDb()('time_slots').orderBy('period');
-    if (shiftId) q.where({ shift_id: shiftId });
-    ok(res, await q);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/time-slots', async (req, res) => {
-  try {
-    const { shift_id, period, start_time = null, end_time = null } = req.body;
-    if (!intParam(shift_id) || !intParam(period)) return fail(res, 'Dados inválidos.');
-    const [row] = await getDb()('time_slots').insert({ shift_id, period, start_time, end_time }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.put('/time-slots/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    const { period, start_time = null, end_time = null } = req.body;
-    if (!id || !intParam(period)) return fail(res, 'Dados inválidos.');
-    await getDb()('time_slots').where({ id }).update({ period, start_time, end_time });
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.delete('/time-slots/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('time_slots').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
 
 // ════════════════════════════════════════════════════════════════════════════
 // GRADE: COMPONENTES POR TURMA
 // ════════════════════════════════════════════════════════════════════════════
 
-router.get('/class-curricula', async (req, res) => {
-  try {
-    const classId = intParam(req.query.classId);
-    if (!classId) return fail(res, 'classId obrigatório.');
-    ok(res, await getDb()('class_curricula').where({ class_id: classId }));
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/class-curricula', async (req, res) => {
-  try {
-    const { class_id, curricula_id, weekly_lessons = 0, modalities = [], remote_allowed = false } = req.body;
-    if (!intParam(class_id) || !intParam(curricula_id)) return fail(res, 'Dados inválidos.');
-    const [row] = await getDb()('class_curricula').insert({
-      class_id, curricula_id,
-      weekly_lessons: parseInt(weekly_lessons) || 0,
-      modalities: JSON.stringify(modalities),
-      remote_allowed: !!remote_allowed,
-    }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) {
-    fail(res, e.message?.includes('unique') || e.message?.includes('UNIQUE') ? 'Componente já associado à turma.' : e.message);
-  }
-});
-
-router.put('/class-curricula/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    const { weekly_lessons = 0, modalities = [], remote_allowed = false } = req.body;
-    await getDb()('class_curricula').where({ id }).update({
-      weekly_lessons: parseInt(weekly_lessons) || 0,
-      modalities: JSON.stringify(modalities),
-      remote_allowed: !!remote_allowed,
-    });
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.delete('/class-curricula/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('class_curricula').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
 // ════════════════════════════════════════════════════════════════════════════
 // PROFESSOR POR COMPONENTE E TURMA
 // ════════════════════════════════════════════════════════════════════════════
 
-router.get('/class-teacher-curricula', async (req, res) => {
-  try {
-    const classId = intParam(req.query.classId);
-    if (!classId) return fail(res, 'classId obrigatório.');
-    ok(res, await getDb()('class_teacher_curricula').where({ class_id: classId }));
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/class-teacher-curricula', async (req, res) => {
-  try {
-    const { class_id, curricula_id, teacher_id } = req.body;
-    if (!intParam(class_id) || !intParam(curricula_id) || !intParam(teacher_id)) return fail(res, 'Dados inválidos.');
-    const [row] = await getDb()('class_teacher_curricula').insert({ class_id, curricula_id, teacher_id }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) {
-    fail(res, e.message?.includes('unique') || e.message?.includes('UNIQUE') ? 'Associação já existe.' : e.message);
-  }
-});
-
-router.delete('/class-teacher-curricula/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('class_teacher_curricula').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
 // ════════════════════════════════════════════════════════════════════════════
 // DIAS DE TRABALHO DO PROFESSOR
 // ════════════════════════════════════════════════════════════════════════════
-
-router.get('/teacher-days/:teacherId', async (req, res) => {
-  try {
-    const id = intParam(req.params.teacherId);
-    if (!id) return fail(res, 'ID inválido.');
-    ok(res, await getDb()('teacher_days').where({ teacher_id: id }).orderBy('weekday'));
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/teacher-days', async (req, res) => {
-  try {
-    const { teacher_id, weekday } = req.body;
-    if (!intParam(teacher_id) || !intParam(weekday)) return fail(res, 'Dados inválidos.');
-    const [row] = await getDb()('teacher_days').insert({ teacher_id, weekday }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) {
-    fail(res, e.message?.includes('unique') || e.message?.includes('UNIQUE') ? 'Dia já cadastrado.' : e.message);
-  }
-});
-
-router.delete('/teacher-days/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('teacher_days').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
 
 // ════════════════════════════════════════════════════════════════════════════
 // LICENÇAS
@@ -1127,17 +752,6 @@ router.post('/licenses/deactivate', async (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 // APP PROFESSOR - AULA.app
 // ════════════════════════════════════════════════════════════════════════════
-
-router.get('/classes/:id/lessons', async (req, res) => {
-  try {
-    const classId = intParam(req.params.id);
-    if (!classId) return fail(res, 'Turma ID inválido.');
-
-    const { data: rows, error: rpcErr } = await getDb().rpc('app_get_class_schedule', { p_class_id: classId });
-    if (rpcErr) throw new Error(rpcErr.message);
-    ok(res, rows || []);
-  } catch (e) { fail(res, 'Erro ao carregar horários: ' + e.message, 500); }
-});
 
 router.get('/schools/:schoolId/classes', async (req, res) => {
   try {

@@ -7,11 +7,8 @@
 
 const router = require('express').Router();
 const { getDb, hashPassword } = require('../../db/database-web');
+const { ok, fail, intParam } = require('../../web/routes/route-helpers');
 
-// Funções auxiliares (idealmente movidas para um arquivo 'route-helpers.js')
-function ok(res, data)   { res.json({ success: true, data }); }
-function fail(res, error, status = 400) { res.status(status).json({ success: false, error }); }
-function intParam(v)     { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : null; }
 
 // GET /api/people?schoolId=X
 // Corresponde a window.aula.getPeople()

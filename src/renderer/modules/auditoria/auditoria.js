@@ -5,7 +5,7 @@
 
 window.ModuleAuditoria = (() => {
   let _schoolId = null;
-  const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const E = window._esc;
 
   const ACTION_LABELS = {
     create:                { label: 'Criação',        color: '#16a34a', bg: '#d1fae5' },

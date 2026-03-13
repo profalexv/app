@@ -5,8 +5,7 @@
 
 window.ModuleNotificacoes = (() => {
   let _schoolId = null;
-  const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
+  const E = 
   async function mount(container) {
     let teachers = [];
     try { teachers = await window.aula.getTeachers(_schoolId); } catch (_) {}

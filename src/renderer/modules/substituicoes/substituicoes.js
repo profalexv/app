@@ -5,7 +5,7 @@
 
 window.ModuleSubstituicoes = (() => {
   let _schoolId = null;
-  const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const E = window._esc;
 
   const STATUS_LABELS = {
     pendente: { label: 'Pendente',   bg: '#fee2e2', color: '#dc2626' },
@@ -28,7 +28,7 @@ window.ModuleSubstituicoes = (() => {
       ]);
       renderList(container, subs, teachers);
     } catch (e) {
-      container.innerHTML = `<p style="color:#dc2626;padding:20px">Erro: ${E(e.message)}</p>`;
+      container.innerHTML = `<p class="error-message">Erro: ${E(e.message)}</p>`;
     }
   }
 
@@ -36,53 +36,47 @@ window.ModuleSubstituicoes = (() => {
     const teacherOptions = teachers.map(t => `<option value="${E(t.id)}">${E(t.name)}</option>`).join('');
 
     container.innerHTML = `
-      <div class="substituicoes-module" style="padding:24px;overflow-y:auto;height:100%">
-        <div class="page-header" style="margin-bottom:20px">
+      <div class="substituicoes-module module-container">
+        <div class="page-header">
           <div>
-            <h1 style="margin:0;font-size:22px">🔄 Substituições</h1>
-            <p class="subtitle" style="margin:4px 0 0">Controle de ausências e substitutos</p>
+            <h1 class="page-title">🔄 Substituições</h1>
+            <p class="subtitle">Controle de ausências e substitutos</p>
           </div>
           <button class="btn btn-primary" id="btn-nova-sub">+ Nova Substituição</button>
         </div>
 
         <!-- Filtro por data -->
-        <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center">
-          <label style="font-size:13px;font-weight:500">Filtrar por data:</label>
-          <input type="date" id="sub-filter-date" class="form-control" style="width:160px">
+        <div class="filter-bar">
+          <label>Filtrar por data:</label>
+          <input type="date" id="sub-filter-date" class="form-control">
           <button class="btn btn-ghost btn-sm" id="sub-clear-filter">Limpar filtro</button>
         </div>
 
         <!-- Lista -->
         <div id="sub-list">
           ${subs.length === 0
-            ? '<div style="text-align:center;padding:40px;color:#6b7280">Nenhuma substituição registrada.</div>'
+            ? '<div class="empty-state">Nenhuma substituição registrada.</div>'
             : subs.map(s => `
-              <div class="sub-card" data-id="${s.id}" style="
-                background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;
-                box-shadow:0 1px 3px rgba(0,0,0,.08);
-                border-left:4px solid ${STATUS_LABELS[s.status]?.color || '#6b7280'}
-              ">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
-                  <div style="flex:1">
-                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <div class="sub-card" data-id="${s.id}" style="--status-color: ${STATUS_LABELS[s.status]?.color || '#6b7280'}">
+                  <div class="sub-card-info">
+                    <div class="sub-card-header">
                       ${statusBadge(s.status)}
-                      <span style="font-size:12px;color:#6b7280">${s.date} — ${WEEKDAY_LABELS[s.weekday] || s.weekday}º período ${s.period}</span>
+                      <span class="date-info">${s.date} — ${WEEKDAY_LABELS[s.weekday] || s.weekday}º período ${s.period}</span>
                     </div>
-                    <div style="font-size:14px;font-weight:600">${E(s.subject) || 'Sem disciplina definida'}</div>
-                    <div style="font-size:13px;color:#374151;margin-top:4px">
+                    <div class="sub-card-subject">${E(s.subject) || 'Sem disciplina definida'}</div>
+                    <div class="sub-card-teachers">
                       Ausente: <strong>${E(s.original_teacher_name)}</strong>
-                      ${s.substitute_teacher_name && s.substitute_teacher_name !== 'A definir'
-                        ? `→ Substituto: <strong>${E(s.substitute_teacher_name)}</strong>`
-                        : '<span style="color:#dc2626"> — Substituto não definido</span>'}
+                      ${s.substitute_teacher_name && s.substitute_teacher_name !== 'A definir' ?
+                        `→ Substituto: <strong>${E(s.substitute_teacher_name)}</strong>` :
+                        '<span class="substitute-pending"> — Substituto não definido</span>'}
                     </div>
-                    ${s.class_name ? `<div style="font-size:12px;color:#6b7280;margin-top:2px">Turma: ${E(s.class_name)}</div>` : ''}
-                    ${s.notes ? `<div style="font-size:12px;color:#6b7280;margin-top:4px;font-style:italic">"${E(s.notes)}"</div>` : ''}
+                    ${s.class_name ? `<div class="sub-card-meta">Turma: ${E(s.class_name)}</div>` : ''}
+                    ${s.notes ? `<div class="sub-card-notes">"${E(s.notes)}"</div>` : ''}
                   </div>
-                  <div style="display:flex;gap:6px;flex-shrink:0">
+                  <div class="sub-card-actions">
                     ${s.status === 'pendente' ? `<button class="btn btn-sm btn-primary sub-assign-btn" data-id="${s.id}" title="Definir substituto">Definir</button>` : ''}
                     <button class="btn btn-sm btn-ghost sub-delete-btn" data-id="${s.id}" title="Remover">✕</button>
                   </div>
-                </div>
               </div>
             `).join('')}
         </div>
@@ -249,14 +243,15 @@ window.ModuleSubstituicoes = (() => {
   }
 
   function renderSubCard(s) {
+    // Esta função parece não ser mais usada após a refatoração de `renderList`, mas a mantenho por segurança.
     return `
-      <div class="sub-card" data-id="${s.id}" style="background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);border-left:4px solid ${STATUS_LABELS[s.status]?.color || '#6b7280'}">
-        <div style="display:flex;justify-content:space-between">
+      <div class="sub-card" data-id="${s.id}" style="--status-color: ${STATUS_LABELS[s.status]?.color || '#6b7280'}">
+        <div class="sub-card-info">
           <div>
             ${statusBadge(s.status)}
-            <span style="font-size:12px;color:#6b7280;margin-left:8px">${s.date}</span>
-            <div style="font-size:14px;font-weight:600;margin-top:6px">${E(s.subject) || '—'}</div>
-            <div style="font-size:13px;color:#374151;margin-top:2px">Ausente: <strong>${E(s.original_teacher_name)}</strong></div>
+            <span class="date-info">${s.date}</span>
+            <div class="sub-card-subject">${E(s.subject) || '—'}</div>
+            <div class="sub-card-teachers">Ausente: <strong>${E(s.original_teacher_name)}</strong></div>
           </div>
         </div>
       </div>`;
