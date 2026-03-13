@@ -10,6 +10,7 @@
 const express    = require('express');
 const crypto     = require('crypto');
 const nodemailer = require('nodemailer');
+const rateLimit  = require('express-rate-limit');
 const router     = express.Router();
 
 const { getDb, hashPassword, verifyPassword } = require('../db/database-web');
@@ -30,6 +31,39 @@ function generateToken() { return crypto.randomBytes(32).toString('hex'); }
 function ok(res, data)   { res.json({ success: true, data }); }
 function fail(res, error, status = 400) { res.status(status).json({ success: false, error }); }
 function intParam(v)     { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : null; }
+
+// ─── Rate limiting — login/registro ──────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Muitas tentativas. Tente novamente em 15 minutos.' },
+  skip: () => DEV_MODE,
+});
+
+// ─── Middleware de autenticação ───────────────────────────────────────────────
+// Rotas protegidas: verifica cookie aula_session antes de processar.
+// As rotas abaixo ficam abertas: auth, webhooks, pagamentos, app professor.
+const PROTECTED_ROUTE_GROUPS = [
+  '/schools', '/admins', '/teachers', '/schedules', '/lessons',
+  '/lesson-plans', '/resources', '/shifts', '/classes', '/curricula',
+  '/time-slots', '/class-curricula', '/class-teacher-curricula',
+  '/teacher-days', '/lesson-types', '/ponto',
+];
+
+async function requireAuth(req, res, next) {
+  const token = req.cookies?.aula_session;
+  if (!token) return res.status(401).json({ success: false, error: 'Não autenticado.' });
+  try {
+    const session = await getDb()('admin_sessions').where({ token }).select('admin_id', 'school_id').first();
+    if (!session) return res.status(401).json({ success: false, error: 'Sessão inválida ou expirada. Faça login novamente.' });
+    req.adminSession = session;
+    next();
+  } catch {
+    res.status(500).json({ success: false, error: 'Erro interno ao verificar autenticação.' });
+  }
+}
 
 function setSessionCookie(res) {
   return (token) => {
@@ -73,14 +107,20 @@ async function sendVerificationEmail(email, name, token) {
   });
 }
 
-// ─── Informações do servidor ────────────────────────────────────────────────
+// ─── Aplicar rate limit em rotas sensíveis ──────────────────────────────────
+router.use(['/auth/login', '/auth/register', '/auth/registerFirstAdmin'], authLimiter);
+
+// ─── Aplicar autenticação nas rotas de dados ─────────────────────────────────
+router.use(PROTECTED_ROUTE_GROUPS, requireAuth);
+
+// ─── Informações do servidor ─────────────────────────────────────────────────
 router.get('/app/dataPath', (req, res) => {
   const url = process.env.DATABASE_URL || '';
   ok(res, url.replace(/:([^:@]+)@/, ':***@')); // mascara senha
 });
 
 router.get('/health', (req, res) => {
-  res.json({ success: true, status: 'healthy', timestamp: new Date().toISOString(), version: '1.0.0' });
+  res.json({ success: true, status: 'healthy', timestamp: new Date().toISOString(), version: '2.0.0' });
 });
 
 router.get('/server-info', async (req, res) => {
@@ -1536,6 +1576,14 @@ router.post('/webhooks/mercadopago', async (req, res) => {
 
     // ── 1. Verificação HMAC ──────────────────────────────────────────────────
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    const isProduction  = process.env.NODE_ENV === 'production';
+
+    // Em produção, sem secret configurado o webhook é ignorado por segurança.
+    if (isProduction && !webhookSecret) {
+      console.error('[WEBHOOK MP] AVISO DE SEGURANÇA: MERCADOPAGO_WEBHOOK_SECRET não configurado em produção. Defina a variável de ambiente.');
+      return res.sendStatus(200);
+    }
+
     if (webhookSecret) {
       const xSignature  = req.headers['x-signature'] || '';
       const xRequestId  = req.headers['x-request-id'] || '';
@@ -2134,6 +2182,200 @@ router.get('/ponto/today', async (req, res) => {
       .select('r.id','r.employee_id','e.name as employee_name','r.type','r.punched_at','r.source','r.latitude','r.longitude')
       .orderBy('r.punched_at', 'asc');
     ok(res, records);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ── PONTO: Vistos Diários de Supervisão ────────────────────────────────────
+
+// GET /ponto/verifications?schoolId=X&employeeId=Y&dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
+router.get('/ponto/verifications', async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId);
+    if (!schoolId) return fail(res, 'schoolId obrigatório.');
+    const q = getDb()('ponto_record_verifications as v')
+      .join('ponto_employees as e', 'e.id', 'v.employee_id')
+      .where('v.school_id', schoolId)
+      .select('v.*', 'e.name as employee_name')
+      .orderBy('v.record_date', 'desc');
+    if (req.query.employeeId) q.where('v.employee_id', intParam(req.query.employeeId));
+    if (req.query.dateFrom)   q.where('v.record_date', '>=', req.query.dateFrom);
+    if (req.query.dateTo)     q.where('v.record_date', '<=', req.query.dateTo);
+    ok(res, await q);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// POST /ponto/verifications — cria ou atualiza visto diário (upsert por employee+date)
+router.post('/ponto/verifications', async (req, res) => {
+  try {
+    const { school_id, employee_id, record_date, verified_by, status, notes } = req.body;
+    if (!school_id || !employee_id || !record_date || !verified_by || !status)
+      return fail(res, 'Campos obrigatórios: school_id, employee_id, record_date, verified_by, status.');
+    if (!['pendente','validado','inconsistente'].includes(status))
+      return fail(res, 'Status inválido. Use: pendente, validado ou inconsistente.');
+    if (status === 'inconsistente' && !notes?.trim())
+      return fail(res, 'Justificativa obrigatória quando status é "inconsistente".');
+    const payload = {
+      school_id, employee_id, record_date, verified_by, status,
+      notes: notes?.trim() || null, verified_at: new Date(),
+    };
+    const existing = await getDb()('ponto_record_verifications')
+      .where({ employee_id, record_date }).first();
+    let row;
+    if (existing) {
+      await getDb()('ponto_record_verifications').where('id', existing.id).update(payload);
+      row = await getDb()('ponto_record_verifications').where('id', existing.id).first();
+    } else {
+      [row] = await getDb()('ponto_record_verifications').insert(payload).returning('*');
+    }
+    ok(res, row);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// PUT /ponto/verifications/:id — atualiza visto existente
+router.put('/ponto/verifications/:id', async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    const { status, notes, verified_by } = req.body;
+    if (status && !['pendente','validado','inconsistente'].includes(status))
+      return fail(res, 'Status inválido.');
+    if (status === 'inconsistente' && !notes?.trim())
+      return fail(res, 'Justificativa obrigatória quando status é "inconsistente".');
+    const update = { verified_at: new Date() };
+    if (status)      update.status      = status;
+    if (notes)       update.notes       = notes.trim();
+    if (verified_by) update.verified_by = verified_by;
+    await getDb()('ponto_record_verifications').where('id', id).update(update);
+    ok(res, await getDb()('ponto_record_verifications').where('id', id).first());
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ── PONTO: Assinaturas Mensais da Folha ────────────────────────────────────
+
+// GET /ponto/signatures?schoolId=X&employeeId=Y&periodMonth=YYYY-MM
+router.get('/ponto/signatures', async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId);
+    if (!schoolId) return fail(res, 'schoolId obrigatório.');
+    const q = getDb()('ponto_signatures as s')
+      .join('ponto_employees as e', 'e.id', 's.employee_id')
+      .where('s.school_id', schoolId)
+      .select('s.*', 'e.name as employee_name')
+      .orderBy(['s.period_month', 'e.name']);
+    if (req.query.employeeId)  q.where('s.employee_id', intParam(req.query.employeeId));
+    if (req.query.periodMonth) q.where('s.period_month', req.query.periodMonth);
+    ok(res, await q);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// POST /ponto/signatures — cria registro pendente para um mês (idempotente)
+router.post('/ponto/signatures', async (req, res) => {
+  try {
+    const { school_id, employee_id, period_month } = req.body;
+    if (!school_id || !employee_id || !period_month)
+      return fail(res, 'Campos obrigatórios: school_id, employee_id, period_month.');
+    if (!/^\d{4}-\d{2}$/.test(period_month))
+      return fail(res, 'period_month deve estar no formato YYYY-MM.');
+    const existing = await getDb()('ponto_signatures').where({ employee_id, period_month }).first();
+    if (existing) return ok(res, existing);
+    const [row] = await getDb()('ponto_signatures')
+      .insert({ school_id, employee_id, period_month })
+      .returning('*');
+    ok(res, row);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// PUT /ponto/signatures/:id/electronic-sign
+// Aceite eletrônico: grava o próprio funcionário como validador + horário do clique
+router.put('/ponto/signatures/:id/electronic-sign', async (req, res) => {
+  try {
+    const id  = intParam(req.params.id);
+    const sig = await getDb()('ponto_signatures').where('id', id).first();
+    if (!sig) return fail(res, 'Registro não encontrado.', 404);
+    if (sig.method) return fail(res, 'Esta folha já foi assinada.');
+    // Funcionário é o próprio validador do aceite eletrônico
+    const emp = await getDb()('ponto_employees').where('id', sig.employee_id).first();
+    if (!emp) return fail(res, 'Funcionário não encontrado.', 404);
+    const now = new Date();
+    await getDb()('ponto_signatures').where('id', id).update({
+      method:                'electronic',
+      signed_at:             now,
+      signed_by_name:        emp.name,
+      signed_by_employee_id: emp.id,
+      validates_all_records: true,
+    });
+    ok(res, await getDb()('ponto_signatures').where('id', id).first());
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// POST /ponto/signatures/:id/upload — envio do scan físico (base64 no body)
+router.post('/ponto/signatures/:id/upload', express.json({ limit: '10mb' }), async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    const { fileData, fileName, uploadedBy } = req.body;
+    if (!fileData || !fileName || !uploadedBy)
+      return fail(res, 'Campos obrigatórios: fileData (base64), fileName, uploadedBy.');
+    const sig = await getDb()('ponto_signatures').where('id', id).first();
+    if (!sig) return fail(res, 'Registro não encontrado.', 404);
+    if (sig.method) return fail(res, 'Esta folha já foi assinada.');
+    const fs   = require('fs');
+    const path = require('path');
+    const dir  = path.join(__dirname, '..', '..', 'uploads', 'ponto-scans',
+      String(sig.school_id), String(sig.employee_id));
+    fs.mkdirSync(dir, { recursive: true });
+    const safeName   = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100);
+    const filePath   = path.join(dir, `${sig.period_month}_${safeName}`);
+    const fileBuffer = Buffer.from(fileData, 'base64');
+    fs.writeFileSync(filePath, fileBuffer);
+    const relPath = path.relative(path.join(__dirname, '..', '..'), filePath);
+    const now = new Date();
+    await getDb()('ponto_signatures').where('id', id).update({
+      method:               'physical',
+      file_path:            relPath,
+      uploaded_by:          uploadedBy,
+      uploaded_at:          now,
+      validates_all_records: true,
+    });
+    ok(res, await getDb()('ponto_signatures').where('id', id).first());
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ── PONTO: Configurações de Assinatura da Escola ───────────────────────────
+
+// GET /ponto/settings?schoolId=X
+router.get('/ponto/settings', async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId);
+    if (!schoolId) return fail(res, 'schoolId obrigatório.');
+    let settings = await getDb()('ponto_school_settings').where('school_id', schoolId).first();
+    if (!settings) {
+      // Retorna defaults sem persistir
+      settings = { school_id: schoolId, allow_electronic_signature: true, allow_physical_signature: true };
+    }
+    ok(res, settings);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// PUT /ponto/settings — atualiza configurações (upsert)
+router.put('/ponto/settings', async (req, res) => {
+  try {
+    const { school_id, allow_electronic_signature, allow_physical_signature } = req.body;
+    if (!school_id) return fail(res, 'school_id obrigatório.');
+    const allowElectronic = allow_electronic_signature !== false;
+    const allowPhysical   = allow_physical_signature   !== false;
+    if (!allowElectronic && !allowPhysical)
+      return fail(res, 'Pelo menos um método de assinatura deve ser permitido.');
+    const payload = {
+      allow_electronic_signature: allowElectronic,
+      allow_physical_signature:   allowPhysical,
+      updated_at: new Date(),
+    };
+    const existing = await getDb()('ponto_school_settings').where('school_id', school_id).first();
+    if (existing) {
+      await getDb()('ponto_school_settings').where('school_id', school_id).update(payload);
+    } else {
+      await getDb()('ponto_school_settings').insert({ school_id, ...payload });
+    }
+    ok(res, await getDb()('ponto_school_settings').where('school_id', school_id).first());
   } catch (e) { fail(res, e.message, 500); }
 });
 

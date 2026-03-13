@@ -30,6 +30,7 @@ if (process.env.NODE_ENV !== 'production') {
 const express      = require('express');
 const path         = require('path');
 const crypto       = require('crypto');
+const helmet       = require('helmet');
 const cookieParser = require('cookie-parser');
 const session      = require('express-session');
 const passport     = require('passport');
@@ -41,6 +42,9 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ─── Middlewares globais ──────────────────────────────────────────────────────
+// Helmet: cabeçalhos de segurança HTTP (X-Frame-Options, X-Content-Type-Options, etc.)
+app.use(helmet({ contentSecurityPolicy: false }));
+
 // O webhook do Mercado Pago precisa do body cru (raw) para verificação HMAC.
 // Deve ser registrado ANTES do express.json() global.
 app.use('/api/webhooks/mercadopago', express.raw({ type: 'application/json' }));
@@ -61,9 +65,11 @@ app.use(passport.session());
 passport.serializeUser((u, done) => done(null, u));
 passport.deserializeUser((u, done) => done(null, u));
 
-// CORS para desenvolvimento local
+// CORS — restrito ao domínio configurado em CORS_ORIGIN.
+// Em desenvolvimento (sem a variável), permite qualquer origem.
+const corsOrigin = process.env.CORS_ORIGIN || (process.env.NODE_ENV !== 'production' ? '*' : '');
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (corsOrigin) res.setHeader('Access-Control-Allow-Origin', corsOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-aula-token');
   if (req.method === 'OPTIONS') return res.sendStatus(204);

@@ -254,37 +254,37 @@ const PONTO_PLANS = {
   per_employee: {
     id: 'per_employee',
     name: 'Por Funcionário',
-    description: 'R$20 para os primeiros 10, R$15 para os próximos 10, R$10 para os demais',
+    description: 'R$20 pelos 8 primeiros, R$16 do 9º ao 16º, R$10 a partir do 17º',
     maxEmployees: 0,   // ilimitado
     basePrice: 0,
     tiers: [
-      { upTo: 10,       pricePerEmployee: 2000 },  // R$20
-      { upTo: 20,       pricePerEmployee: 1500 },  // R$15
-      { upTo: Infinity, pricePerEmployee: 1000 },  // R$10
+      { upTo: 8,        pricePerEmployee: 2000 },  // R$20 (1º–8º)
+      { upTo: 16,       pricePerEmployee: 1600 },  // R$16 (9º–16º)
+      { upTo: Infinity, pricePerEmployee: 1000 },  // R$10 (17º em diante)
     ],
   },
   mini: {
     id: 'mini',
     name: 'Ponto Mini',
-    description: 'Até 30 funcionários — R$300/mês (R$10 por funcionário extra)',
+    description: 'Até 30 funcionários — R$340/mês (R$10 por funcionário extra)',
     maxEmployees: 30,
-    basePrice: 30000,           // R$300 em centavos
+    basePrice: 34000,           // R$340 em centavos
     extraPricePerEmployee: 1000, // R$10
   },
   pronto: {
     id: 'pronto',
     name: 'Ponto Pronto',
-    description: 'Até 80 funcionários — R$600/mês (R$10 por funcionário extra)',
+    description: 'Até 80 funcionários — R$640/mês (R$10 por funcionário extra)',
     maxEmployees: 80,
-    basePrice: 60000,
+    basePrice: 64000,           // R$640 em centavos
     extraPricePerEmployee: 1000,
   },
   maximo: {
     id: 'maximo',
     name: 'Ponto Máximo',
-    description: 'Funcionários ilimitados — R$900/mês',
+    description: 'Funcionários ilimitados — R$980/mês',
     maxEmployees: 0,
-    basePrice: 90000,
+    basePrice: 98000,           // R$980 em centavos
     extraPricePerEmployee: 0,
   },
 };
@@ -294,12 +294,12 @@ function calcPontoPrice(planType, employeeCount) {
   const plan = PONTO_PLANS[planType];
   if (!plan) return 0;
   if (planType === 'per_employee') {
-    let total = 0, remaining = employeeCount;
+    let total = 0, consumed = 0;
     for (const tier of plan.tiers) {
-      if (remaining <= 0) break;
-      const inTier = tier.upTo === Infinity ? remaining : Math.min(remaining, tier.upTo - (employeeCount - remaining));
-      total += inTier * tier.pricePerEmployee;
-      remaining -= inTier;
+      if (consumed >= employeeCount) break;
+      const tierMax = tier.upTo === Infinity ? employeeCount : Math.min(tier.upTo, employeeCount);
+      const inTier  = tierMax - consumed;
+      if (inTier > 0) { total += inTier * tier.pricePerEmployee; consumed += inTier; }
     }
     return total;
   }

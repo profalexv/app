@@ -20,18 +20,9 @@ seed-test-data.js
 test-app.sh
 test-server-detection.sh
 
-# Documentação interna de desenvolvimento (fica no repo Scholar/system)
-ARQUITETURA_CONEXAO.md
-ARQUITETURA_MOTOR.md
-CONCLUSAO.md
-DETECCAO_SERVIDOR.md
-IMPLEMENTACAO.md
-IMPLEMENTACAO_DETECCAO.md
-IMPLEMENTACAO_MOTOR_CHECKLIST.md
-INDICE_DETECCAO.md
-INTEGRACAO_APP_MOBILE.md
-INTEGRACAO_VISUAL.md
-SETUP_CLOUDFLARE_TUNNEL.md
+# Documentação interna de desenvolvimento (fica no repo Scholar/app)
+ARQUITETURA.md
+DESENVOLVIMENTO.md
 
 # OS
 .DS_Store

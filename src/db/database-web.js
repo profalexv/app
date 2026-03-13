@@ -190,10 +190,12 @@ class TableQuery {
  */
 function getDb() {
   const factory = (tableName) => new TableQuery(_supabase, tableName);
-  factory.rpc    = (fn, args)             => _supabase?.rpc(fn, args);
-  factory.upsert = (table, data, opts)    => _supabase?.from(TABLE_MAP[table] || table).upsert(data, opts);
+  factory.rpc         = (fn, args)          => _supabase?.rpc(fn, args);
+  factory.upsert      = (table, data, opts) => _supabase?.from(TABLE_MAP[table] || table).upsert(data, opts);
   // raw() legado — lança erro descritivo
-  factory.raw    = (_sql) => { throw new Error('getDb().raw() não suportado no modo Supabase. Refatore para rpc() ou upsert().'); };
+  factory.raw         = (_sql) => { throw new Error('getDb().raw() não suportado no modo Supabase. Refatore para rpc() ou upsert().'); };
+  // transaction — Supabase JS não suporta transações client-side; executa o callback sequencialmente
+  factory.transaction = async (fn) => fn(factory);
   return factory;
 }
 

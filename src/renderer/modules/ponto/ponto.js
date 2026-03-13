@@ -1,9 +1,12 @@
 /**
  * Módulo de Registro de Ponto de Funcionário
  *
- * Abas: Hoje | Funcionários | Histórico | Assinatura
+ * Abas: Hoje | Funcionários | Histórico | Verificação | Folha | Assinatura
  *
  * Conformidade: CLT Art. 74 / Portaria MTP 671/2021 (REP-A) / LGPD
+ *
+ * Verificação : visto diário pelo supervisor (pendente/validado/inconsistente)
+ * Folha        : aceite mensal pelo funcionário (eletrônico ou scan físico)
  */
 
 window.ModulePonto = (() => {
@@ -56,6 +59,8 @@ window.ModulePonto = (() => {
           <button class="ponto-tab active" data-ponto-tab="hoje" role="tab">📋 Hoje</button>
           <button class="ponto-tab" data-ponto-tab="funcionarios" role="tab">👤 Funcionários</button>
           <button class="ponto-tab" data-ponto-tab="historico" role="tab">📅 Histórico</button>
+          <button class="ponto-tab" data-ponto-tab="verificacao" role="tab">✅ Verificação</button>
+          <button class="ponto-tab" data-ponto-tab="folha" role="tab">📄 Folha Mensal</button>
           <button class="ponto-tab" data-ponto-tab="assinatura" role="tab">💳 Assinatura</button>
         </div>
 
@@ -471,10 +476,10 @@ window.ModulePonto = (() => {
         ${!active ? `
           <div class="ponto-plans-grid">
             <h3 style="grid-column:1/-1;margin-bottom:4px">Contratar Addon Ponto</h3>
-            ${planCard('per_employee','Por Funcionário','R$ 20 (1-10) / R$ 15 (11-20) / R$ 10 (21+)','Pague apenas pelos funcionários cadastrados')}
-            ${planCard('mini','PONTO MINI','R$ 300/mês','Até 30 funcionários · R$ 10/extra')}
-            ${planCard('pronto','PONTO PRONTO','R$ 600/mês','Até 80 funcionários · R$ 10/extra')}
-            ${planCard('maximo','PONTO MÁXIMO','R$ 900/mês','Funcionários ilimitados')}
+            ${planCard('per_employee','Por Funcionário','R$ 20 (1-8) / R$ 16 (9-16) / R$ 10 (17+)','Pague apenas pelos funcionários cadastrados')}
+            ${planCard('mini','PONTO MINI','R$ 340/mês','Até 30 funcionários · R$ 10/extra')}
+            ${planCard('pronto','PONTO PRONTO','R$ 640/mês','Até 80 funcionários · R$ 10/extra')}
+            ${planCard('maximo','PONTO MÁXIMO','R$ 980/mês','Funcionários ilimitados')}
           </div>` : ''}
         ${active ? '<div style="margin-top:16px"><button class="btn btn-ghost btn-sm" id="ponto-btn-cancel-sub">Cancelar addon Ponto</button></div>' : ''}
       `;
@@ -523,6 +528,390 @@ window.ModulePonto = (() => {
   function updateTabVisibility(visible) {
     const pontoTab = document.querySelector('.tab-btn[data-module="ponto"]');
     if (pontoTab) pontoTab.style.display = visible ? '' : 'none';
+  }
+
+  // ── Aba: Verificação (Visto Diário de Supervisão) ───────────────────────────
+
+  async function renderVerificacao(container) {
+    const today = new Date().toISOString().slice(0, 10);
+    container.innerHTML = `
+      <div class="ponto-section-header" style="flex-wrap:wrap;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <label style="color:#374151;font-size:13px;font-weight:500">Data:</label>
+          <input type="date" id="pv-date" value="${today}" class="input-sm">
+          <button class="btn btn-primary btn-sm" id="pv-load">🔍 Carregar</button>
+          <button class="btn btn-ghost btn-sm" id="pv-add">+ Novo Visto</button>
+        </div>
+      </div>
+      <div id="ponto-verif-result" class="ponto-loading">Carregando...</div>`;
+
+    const doLoad = async () => {
+      const date = document.getElementById('pv-date')?.value;
+      await loadVerificacoes(date);
+    };
+    document.getElementById('pv-load')?.addEventListener('click', doLoad);
+    document.getElementById('pv-add')?.addEventListener('click', () => openVerifModal(null, doLoad));
+    await doLoad();
+  }
+
+  async function loadVerificacoes(date) {
+    const result = document.getElementById('ponto-verif-result');
+    if (!result) return;
+    result.innerHTML = '<div class="ponto-loading">Carregando...</div>';
+    try {
+      const params = { schoolId: _schoolId };
+      if (date) { params.dateFrom = date; params.dateTo = date; }
+      const verifs = await window.DB.getPontoVerifications(params);
+
+      if (!verifs?.length) {
+        result.innerHTML = `<div class="ponto-empty"><p>Nenhum visto registrado para essa data.</p><button class="btn btn-ghost btn-sm" id="pv-empty-add">+ Registrar visto</button></div>`;
+        document.getElementById('pv-empty-add')?.addEventListener('click', () => openVerifModal(null, () => loadVerificacoes(date)));
+        return;
+      }
+
+      const STATUS_BADGE = {
+        pendente:      '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;color:#92400e;background:#fef3c7">⏳ Pendente</span>',
+        validado:      '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;color:#065f46;background:#d1fae5">✅ Validado</span>',
+        inconsistente: '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;color:#991b1b;background:#fee2e2">⚠️ Inconsistente</span>',
+      };
+
+      const rows = verifs.map(v => `
+        <tr>
+          <td>${E(v.employee_name)}</td>
+          <td>${E(v.record_date)}</td>
+          <td>${STATUS_BADGE[v.status] || E(v.status)}</td>
+          <td>${E(v.verified_by)}</td>
+          <td>${fmtDate(v.verified_at)}</td>
+          <td style="font-size:11px;color:#6b7280;max-width:200px;word-break:break-word">${E(v.notes || '—')}</td>
+          <td><button class="btn btn-ghost btn-sm pv-edit-btn" data-verif-id="${v.id}">✏️</button></td>
+        </tr>`).join('');
+
+      result.innerHTML = `
+        <div style="font-size:12px;color:#6b7280;padding:4px 0">${verifs.length} visto(s)</div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr><th>Funcionário</th><th>Data</th><th>Status</th><th>Supervisor</th><th>Visitado em</th><th>Observações</th><th>Ação</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+
+      result.querySelectorAll('.pv-edit-btn').forEach(btn => {
+        const v = verifs.find(x => x.id === parseInt(btn.dataset.verifId, 10));
+        btn.addEventListener('click', () => openVerifModal(v, () => loadVerificacoes(date)));
+      });
+    } catch (e) {
+      result.innerHTML = `<div class="ponto-error">Erro: ${E(e.message)}</div>`;
+    }
+  }
+
+  async function openVerifModal(existing, onDone) {
+    let employees = [];
+    if (!existing) {
+      try {
+        const all = await window.DB.getPontoEmployees(_schoolId);
+        employees = all.filter(e => e.active);
+      } catch (_) {}
+    }
+
+    window.openModal({
+      title: existing ? '✏️ Atualizar Visto' : '✅ Registrar Visto Diário',
+      bodyHtml: `
+        ${!existing ? `
+        <div class="form-group">
+          <label>Funcionário *</label>
+          <select id="pv-modal-emp">
+            <option value="">Selecione...</option>
+            ${employees.map(e => `<option value="${e.id}">${E(e.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Data *</label>
+          <input type="date" id="pv-modal-date" value="${new Date().toISOString().slice(0, 10)}">
+        </div>` : `<p style="color:#374151;font-size:13px;margin-bottom:12px"><strong>${E(existing.employee_name)}</strong> — ${E(existing.record_date)}</p>`}
+        <div class="form-group">
+          <label>Supervisor (seu nome) *</label>
+          <input type="text" id="pv-modal-by" value="${E(existing?.verified_by || '')}" placeholder="Nome do supervisor">
+        </div>
+        <div class="form-group">
+          <label>Status *</label>
+          <select id="pv-modal-status">
+            <option value="pendente" ${existing?.status === 'pendente' ? 'selected' : ''}>⏳ Pendente</option>
+            <option value="validado" ${existing?.status === 'validado' ? 'selected' : ''}>✅ Validado</option>
+            <option value="inconsistente" ${existing?.status === 'inconsistente' ? 'selected' : ''}>⚠️ Inconsistente</option>
+          </select>
+        </div>
+        <div id="pv-notes-group" style="${existing?.status === 'inconsistente' ? '' : 'display:none'}">
+          <div class="form-group">
+            <label>Observações / Justificativa *</label>
+            <textarea id="pv-modal-notes" rows="3" placeholder="Descreva a inconsistência encontrada">${E(existing?.notes || '')}</textarea>
+          </div>
+        </div>`,
+      confirmLabel: existing ? 'Salvar Alteração' : 'Registrar Visto',
+      onConfirm: async (overlay, close) => {
+        const status = overlay.querySelector('#pv-modal-status').value;
+        const by     = overlay.querySelector('#pv-modal-by').value.trim();
+        const notes  = overlay.querySelector('#pv-modal-notes')?.value.trim() || '';
+        if (!by) { window.showToast('Informe o nome do supervisor.', 'warning'); return; }
+        if (status === 'inconsistente' && !notes) { window.showToast('Justificativa obrigatória para status Inconsistente.', 'warning'); return; }
+        try {
+          if (existing) {
+            await window.DB.updatePontoVerification(existing.id, { status, notes: notes || null, verified_by: by });
+          } else {
+            const empId = overlay.querySelector('#pv-modal-emp')?.value;
+            const date  = overlay.querySelector('#pv-modal-date')?.value;
+            if (!empId || !date) { window.showToast('Selecione o funcionário e a data.', 'warning'); return; }
+            await window.DB.createPontoVerification({
+              school_id: _schoolId, employee_id: parseInt(empId, 10),
+              record_date: date, verified_by: by, status, notes: notes || null,
+            });
+          }
+          window.showToast('Visto registrado.', 'success');
+          close();
+          if (onDone) onDone();
+        } catch (e) { window.showToast(e.message, 'error'); }
+      },
+    });
+
+    document.getElementById('pv-modal-status')?.addEventListener('change', ev => {
+      const notesGroup = document.getElementById('pv-notes-group');
+      if (notesGroup) notesGroup.style.display = (ev.target.value === 'inconsistente') ? '' : 'none';
+    });
+  }
+
+  // ── Aba: Folha Mensal (Aceite do Funcionário) ────────────────────────────────
+
+  async function renderFolha(container) {
+    const now = new Date();
+    const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    container.innerHTML = `
+      <div class="ponto-section-header" style="flex-wrap:wrap;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <label style="color:#374151;font-size:13px;font-weight:500">Mês:</label>
+          <input type="month" id="pf-month" value="${curMonth}" class="input-sm">
+          <button class="btn btn-primary btn-sm" id="pf-load">🔍 Carregar</button>
+        </div>
+      </div>
+      <div id="ponto-folha-result" class="ponto-loading">Carregando...</div>`;
+
+    const doLoad = async () => {
+      const month = document.getElementById('pf-month')?.value;
+      await loadFolha(month);
+    };
+    document.getElementById('pf-load')?.addEventListener('click', doLoad);
+    await doLoad();
+  }
+
+  async function loadFolha(periodMonth) {
+    const result = document.getElementById('ponto-folha-result');
+    if (!result) return;
+    result.innerHTML = '<div class="ponto-loading">Carregando...</div>';
+    try {
+      const [employees, signatures, settings] = await Promise.all([
+        window.DB.getPontoEmployees(_schoolId),
+        window.DB.getPontoSignatures({ schoolId: _schoolId, periodMonth }),
+        window.DB.getPontoSettings(_schoolId),
+      ]);
+
+      const allowElectronic = settings?.allow_electronic_signature !== false;
+      const allowPhysical   = settings?.allow_physical_signature   !== false;
+      const sigMap = {};
+      (signatures || []).forEach(s => { sigMap[s.employee_id] = s; });
+
+      const activeEmps = (employees || []).filter(e => !e.deleted_at);
+      if (!activeEmps.length) {
+        result.innerHTML = `<div class="ponto-empty"><p>Nenhum funcionário cadastrado.</p></div>`;
+        return;
+      }
+
+      const rows = activeEmps.map(emp => {
+        const sig = sigMap[emp.id];
+        let statusCell, actionCell;
+
+        if (!sig || !sig.method) {
+          statusCell = `<span style="color:#92400e;font-weight:500">⏳ Pendente</span>`;
+          const btns = [];
+          if (allowElectronic) btns.push(`<button class="btn btn-primary btn-sm pf-e-sign" data-emp-id="${emp.id}" data-emp-name="${E(emp.name)}" data-sig-id="${sig?.id || ''}">✅ Aceite Eletrônico</button>`);
+          if (allowPhysical)   btns.push(`<button class="btn btn-ghost btn-sm pf-upload" data-emp-id="${emp.id}" data-emp-name="${E(emp.name)}" data-sig-id="${sig?.id || ''}">📤 Upload Scan</button>`);
+          actionCell = btns.length ? btns.join(' ') : '<span style="color:#6b7280;font-size:11px">Nenhum método habilitado</span>';
+        } else if (sig.method === 'electronic') {
+          statusCell = `<span style="color:#065f46;font-weight:500">✅ Assinado Eletronicamente</span>`;
+          actionCell = `<span style="font-size:11px;color:#6b7280">${E(sig.signed_by_name)} · ${fmtDate(sig.signed_at)}</span>`;
+        } else {
+          statusCell = `<span style="color:#1d4ed8;font-weight:500">📁 Scan Enviado</span>`;
+          actionCell = `<span style="font-size:11px;color:#6b7280">Upload por ${E(sig.uploaded_by)} · ${fmtDate(sig.uploaded_at)}</span>`;
+        }
+
+        return `<tr>
+          <td>${E(emp.name)}</td>
+          <td>${statusCell}</td>
+          <td>${actionCell}</td>
+        </tr>`;
+      }).join('');
+
+      result.innerHTML = `
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#14532d">
+          Aceite eletrônico grava o próprio funcionário como validador + data/hora do clique.
+          Envio do scan físico valida todos os registros do período.
+          ${!allowElectronic ? ' <strong>· Aceite eletrônico desativado para esta escola.</strong>' : ''}
+          ${!allowPhysical   ? ' <strong>· Envio físico desativado para esta escola.</strong>'    : ''}
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr><th>Funcionário</th><th>Status</th><th>Detalhe / Ação</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-ghost btn-sm" id="pf-settings-btn">⚙️ Config. de Assinatura</button>
+        </div>`;
+
+      result.querySelectorAll('.pf-e-sign').forEach(btn => {
+        btn.addEventListener('click', () =>
+          openElectronicSignModal(btn.dataset, periodMonth, () => loadFolha(periodMonth)));
+      });
+      result.querySelectorAll('.pf-upload').forEach(btn => {
+        btn.addEventListener('click', () =>
+          openUploadScanModal(btn.dataset, periodMonth, () => loadFolha(periodMonth)));
+      });
+      document.getElementById('pf-settings-btn')?.addEventListener('click', () =>
+        openFolhaSettings(settings, periodMonth));
+    } catch (e) {
+      result.innerHTML = `<div class="ponto-error">Erro: ${E(e.message)}</div>`;
+    }
+  }
+
+  async function openElectronicSignModal(dataset, periodMonth, onDone) {
+    const empName = dataset.empName;
+    const empId   = parseInt(dataset.empId, 10);
+    let   sigId   = parseInt(dataset.sigId, 10) || 0;
+
+    window.openModal({
+      title: '✅ Aceite Eletrônico — Folha de Ponto',
+      bodyHtml: `
+        <p style="color:#374151;font-size:14px;margin-bottom:8px">
+          <strong>${E(empName)}</strong> — ${E(periodMonth)}
+        </p>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;color:#14532d">
+          Ao confirmar, o aceite eletrônico da folha de ponto do período
+          <strong>${E(periodMonth)}</strong> será registrado com o nome deste funcionário
+          e o horário atual como validador. Todos os registros do período serão validados.
+        </div>
+        <p style="font-size:12px;color:#6b7280">
+          ⚠️ Esta ação não pode ser desfeita.
+          Caso haja inconsistência, utilize o Visto de Supervisão.
+        </p>`,
+      confirmLabel: '✅ Confirmar Aceite',
+      onConfirm: async (overlay, close) => {
+        try {
+          if (!sigId) {
+            const created = await window.DB.createPontoSignature({
+              school_id: _schoolId, employee_id: empId, period_month: periodMonth,
+            });
+            sigId = created?.id;
+          }
+          await window.DB.electronicSignPonto(sigId);
+          window.showToast('Aceite eletrônico registrado com sucesso.', 'success');
+          close();
+          if (onDone) onDone();
+        } catch (e) { window.showToast(e.message, 'error'); }
+      },
+    });
+  }
+
+  function openUploadScanModal(dataset, periodMonth, onDone) {
+    const empName = dataset.empName;
+    const empId   = parseInt(dataset.empId, 10);
+    let   sigId   = parseInt(dataset.sigId, 10) || 0;
+
+    window.openModal({
+      title: '📤 Upload — Scan da Folha Assinada',
+      bodyHtml: `
+        <p style="color:#374151;font-size:14px;margin-bottom:8px">
+          <strong>${E(empName)}</strong> — ${E(periodMonth)}
+        </p>
+        <div class="form-group">
+          <label>Arquivo (PDF ou imagem) *</label>
+          <input type="file" id="pf-upload-file" accept=".pdf,.jpg,.jpeg,.png">
+        </div>
+        <div class="form-group">
+          <label>Quem está fazendo o upload *</label>
+          <input type="text" id="pf-upload-by" placeholder="Seu nome">
+        </div>
+        <p style="font-size:12px;color:#6b7280">
+          O envio do scan físico valida todos os registros do período.
+        </p>`,
+      confirmLabel: '📤 Enviar Arquivo',
+      onConfirm: async (overlay, close) => {
+        const fileInput = overlay.querySelector('#pf-upload-file');
+        const uploadBy  = overlay.querySelector('#pf-upload-by').value.trim();
+        const file      = fileInput?.files?.[0];
+        if (!file)     { window.showToast('Selecione um arquivo.', 'warning'); return; }
+        if (!uploadBy) { window.showToast('Informe quem está fazendo o upload.', 'warning'); return; }
+        if (file.size > 10 * 1024 * 1024) { window.showToast('Arquivo muito grande (máx. 10 MB).', 'warning'); return; }
+        try {
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload  = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          if (!sigId) {
+            const created = await window.DB.createPontoSignature({
+              school_id: _schoolId, employee_id: empId, period_month: periodMonth,
+            });
+            sigId = created?.id;
+          }
+          await window.DB.uploadPontoSignature(sigId, {
+            fileData: base64, fileName: file.name, uploadedBy: uploadBy,
+          });
+          window.showToast('Scan enviado e folha arquivada.', 'success');
+          close();
+          if (onDone) onDone();
+        } catch (e) { window.showToast(e.message, 'error'); }
+      },
+    });
+  }
+
+  function openFolhaSettings(currentSettings, periodMonth) {
+    window.openModal({
+      title: '⚙️ Configurações de Assinatura',
+      bodyHtml: `
+        <p style="color:#6b7280;font-size:13px;margin-bottom:12px">
+          Define quais métodos de assinatura são aceitos nesta escola.
+        </p>
+        <div class="form-group">
+          <label class="checkbox-label" style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="pfs-electronic" ${currentSettings?.allow_electronic_signature !== false ? 'checked' : ''}>
+            <span>✅ Permitir aceite eletrônico (clique do funcionário no app)</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label" style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="pfs-physical" ${currentSettings?.allow_physical_signature !== false ? 'checked' : ''}>
+            <span>📄 Permitir envio de scan físico assinado</span>
+          </label>
+        </div>`,
+      confirmLabel: 'Salvar Configurações',
+      onConfirm: async (overlay, close) => {
+        const allowElectronic = overlay.querySelector('#pfs-electronic').checked;
+        const allowPhysical   = overlay.querySelector('#pfs-physical').checked;
+        if (!allowElectronic && !allowPhysical) {
+          window.showToast('Pelo menos um método de assinatura deve ser permitido.', 'warning');
+          return;
+        }
+        try {
+          await window.DB.updatePontoSettings({
+            school_id: _schoolId,
+            allow_electronic_signature: allowElectronic,
+            allow_physical_signature: allowPhysical,
+          });
+          window.showToast('Configurações salvas.', 'success');
+          close();
+          const content = document.getElementById('ponto-tab-content');
+          if (content && _tab === 'folha') await renderFolha(content);
+        } catch (e) { window.showToast(e.message, 'error'); }
+      },
+    });
   }
 
   // ── Modal: Bater Ponto ───────────────────────────────────────────────────────
@@ -628,6 +1017,8 @@ window.ModulePonto = (() => {
       case 'hoje':         renderHoje(content);         break;
       case 'funcionarios': renderFuncionarios(content); break;
       case 'historico':    renderHistorico(content);    break;
+      case 'verificacao':  renderVerificacao(content);  break;
+      case 'folha':        renderFolha(content);        break;
       case 'assinatura':   renderAssinatura(content);   break;
     }
   }

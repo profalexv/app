@@ -193,6 +193,18 @@ class DataProvider {
   createPontoRecord(data)           { return this._provider.createPontoRecord(data); }
   cancelPontoRecord(id, data)       { return this._provider.cancelPontoRecord(id, data); }
   exportPontoAfd(params)            { return this._provider.exportPontoAfd(params); }
+  // Vistos diários de supervisão
+  getPontoVerifications(params)     { return this._provider.getPontoVerifications(params); }
+  createPontoVerification(data)     { return this._provider.createPontoVerification(data); }
+  updatePontoVerification(id, data) { return this._provider.updatePontoVerification(id, data); }
+  // Assinaturas mensais
+  getPontoSignatures(params)        { return this._provider.getPontoSignatures(params); }
+  createPontoSignature(data)        { return this._provider.createPontoSignature(data); }
+  electronicSignPonto(id)           { return this._provider.electronicSignPonto(id); }
+  uploadPontoSignature(id, data)    { return this._provider.uploadPontoSignature(id, data); }
+  // Configurações de assinatura da escola
+  getPontoSettings(schoolId)        { return this._provider.getPontoSettings(schoolId); }
+  updatePontoSettings(data)         { return this._provider.updatePontoSettings(data); }
 }
 
 /**

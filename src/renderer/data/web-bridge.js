@@ -223,6 +223,19 @@
     cancelPontoRecord:  (id, data) => put(`/ponto/records/${id}/cancel`, data),
     // Exportação AFD para fiscalização MTP (Portaria 671)
     exportPontoAfd:     (params)   => get(`/ponto/records/export-afd?${new URLSearchParams(params).toString()}`),
+    // Vistos diários de supervisão (um visto por funcionário por data)
+    getPontoVerifications:   (params)    => get(`/ponto/verifications?${new URLSearchParams(params).toString()}`),
+    createPontoVerification: (data)      => post('/ponto/verifications', data),
+    updatePontoVerification: (id, data)  => put(`/ponto/verifications/${id}`, data),
+    // Assinaturas mensais da folha (aceite eletrônico ou envio de scan físico)
+    getPontoSignatures:      (params)    => get(`/ponto/signatures?${new URLSearchParams(params).toString()}`),
+    createPontoSignature:    (data)      => post('/ponto/signatures', data),
+    // Aceite eletrônico: grava o próprio funcionário como validador + horário
+    electronicSignPonto:     (id)        => put(`/ponto/signatures/${id}/electronic-sign`, {}),
+    uploadPontoSignature:    (id, data)  => post(`/ponto/signatures/${id}/upload`, data),
+    // Configurações de assinatura por escola (eletrônico, físico, ou ambos)
+    getPontoSettings:        (schoolId)  => get(`/ponto/settings?schoolId=${schoolId}`),
+    updatePontoSettings:     (data)      => put('/ponto/settings', data),
   };
 
   console.log('[web-bridge] window.aula configurado via HTTP →', API_BASE);
