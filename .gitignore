@@ -15,9 +15,6 @@ logs/
 dist/
 coverage/
 
-# Backend infra (Supabase, migrations, secrets) — não sobe para o GitHub público
-motor/
-
 # Dev/teste local
 seed-test-data.js
 test-app.sh
