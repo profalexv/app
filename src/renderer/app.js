@@ -89,6 +89,8 @@ const MODULES = {
   calendario:   window.ModuleCalendario,
   notificacoes: window.ModuleNotificacoes,
   auditoria:    window.ModuleAuditoria,
+  escolar:      window.ModuleEscolar,
+  financeiro:   window.ModuleFinanceiro,
   licencas:     { mount(c) { window.LicenseManager.renderManagementScreen(c); } },
 };
 
@@ -479,6 +481,23 @@ function setupMainApp() {
     .then(st => {
       const pontoTab = document.querySelector('.tab-btn[data-module="ponto"]');
       if (pontoTab) pontoTab.style.display = st?.active ? '' : 'none';
+    })
+    .catch(() => {});
+
+  // Exibe aba Escolar apenas se addon estiver ativo
+  window.aula.getEscolarStatus?.(window.AppContext.schoolId)
+    .then(st => {
+      const escolarTab = document.querySelector('.tab-btn[data-module="escolar"]');
+      if (escolarTab) escolarTab.style.display = st?.active ? '' : 'none';
+    })
+    .catch(() => {});
+
+  // Exibe aba Financeiro apenas se addon estiver ativo
+  window.aula.getFinanceiroStatus?.(window.AppContext.schoolId)
+    .then(st => {
+      const finTab = document.querySelector('.tab-btn[data-module="financeiro"]');
+      if (finTab) finTab.style.display = st?.active ? '' : 'none';
+      if (st?.active) window.ModuleFinanceiro?.initialize?.(window.AppContext.schoolId);
     })
     .catch(() => {});
 

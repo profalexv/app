@@ -307,6 +307,54 @@ function calcPontoPrice(planType, employeeCount) {
   return plan.basePrice + extra * (plan.extraPricePerEmployee || 0);
 }
 
+// ADD-ON ESCOLAR: Frequência, Diário do Professor, Ocorrências
+const ESCOLAR_PLANS = {
+  lite: {
+    id: 'lite',
+    name: 'Escolar Lite',
+    description: 'Até 10 turmas — R$560/mês · excedente R$43/turma',
+    maxClasses: 10,
+    basePrice: 56000,            // R$560 em centavos
+    extraPricePerClass: 4300,    // R$43 por turma além do limite
+  },
+  basic: {
+    id: 'basic',
+    name: 'Escolar Basic',
+    description: 'Até 30 turmas — R$980/mês · excedente R$34/turma',
+    maxClasses: 30,
+    basePrice: 98000,            // R$980 em centavos
+    extraPricePerClass: 3400,    // R$34 por turma além do limite
+  },
+  flex: {
+    id: 'flex',
+    name: 'Escolar Flex',
+    description: 'Até 60 turmas — R$1.790/mês · excedente R$28/turma',
+    maxClasses: 60,
+    basePrice: 179000,           // R$1.790 em centavos
+    extraPricePerClass: 2800,    // R$28 por turma além do limite
+  },
+  total: {
+    id: 'total',
+    name: 'Escolar Total',
+    description: 'Ilimitado por unidade · Rede: até 100 turmas — R$2.600/mês · excedente R$23/turma',
+    maxClasses: 0,               // 0 = ilimitado (unidade escolar individual)
+    networkMaxClasses: 100,      // limite incluído para redes de escolas
+    basePrice: 260000,           // R$2.600 em centavos
+    extraPricePerClass: 2300,    // R$23 por turma além de 100 (apenas redes)
+  },
+};
+
+/** Calcula o preço mensal do addon Escolar para um número de turmas */
+function calcEscolarPrice(planType, classCount, isNetwork = false) {
+  const plan = ESCOLAR_PLANS[planType];
+  if (!plan) return 0;
+  // Total em unidade individual: sem limite, sem excedente
+  if (planType === 'total' && !isNetwork) return plan.basePrice;
+  const limit = planType === 'total' ? plan.networkMaxClasses : plan.maxClasses;
+  const extra = Math.max(0, classCount - limit);
+  return plan.basePrice + extra * plan.extraPricePerClass;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CLASSE GERENCIADORA
 // ═══════════════════════════════════════════════════════════════════════════
@@ -523,4 +571,12 @@ class SubscriptionManager {
   }
 }
 
-module.exports = { SubscriptionManager, PLANS, ADD_ONS };
+// ── Addon FINANCEIRO ─────────────────────────────────────────────────────────
+// R$0,30 por aluno ativo/mês + 0,5% por transação (mode scholar_managed)
+const FINANCEIRO_FEE_PER_STUDENT = 30;    // centavos
+const FINANCEIRO_COMMISSION_RATE = 0.005; // 0,5%
+
+module.exports = {
+  SubscriptionManager, PLANS, ADD_ONS, PONTO_PLANS, ESCOLAR_PLANS, calcEscolarPrice,
+  FINANCEIRO_FEE_PER_STUDENT, FINANCEIRO_COMMISSION_RATE,
+};

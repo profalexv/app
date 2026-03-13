@@ -34,13 +34,17 @@ const teacherDaysRoutes = require('./routes/teacher-days.routes');
 const licenseRoutes = require('./routes/licenses.routes');
 const lessonTypesRoutes = require('./routes/lesson-types.routes.js');
 const tutorRolesRoutes = require('./routes/tutor-roles.routes.js');
-const pontoRoutes = require('./routes/ponto.routes');
+const pontoRoutes       = require('./routes/ponto.routes');
+const escolarRoutes     = require('./routes/escolar.routes');
+const financeiroRoutes  = require('./routes/financeiro.routes');
 
 const AVAILABLE_MODULES = {
   cronograma: { id: 'cronograma', name: 'Cronograma',              description: 'Criação e gerenciamento de grades de horários escolares.',      icon: '📅' },
   aula:       { id: 'aula',       name: 'Registro de Aulas',       description: 'Registro e controle de aulas ministradas por professor.',        icon: '📝' },
   plano:      { id: 'plano',      name: 'Plano de Aula',           description: 'Criação e gerenciamento de planos de aula estruturados.',       icon: '📋' },
   ponto:      { id: 'ponto',      name: 'Registro de Ponto',       description: 'Controle de presença e jornada de funcionários com GPS.',       icon: '🕐' },
+  escolar:    { id: 'escolar',    name: 'Escolar',                   description: 'Chamada de presença, diário do professor e ocorrências.',        icon: '🎓' },
+  financeiro: { id: 'financeiro', name: 'Financeiro',                  description: 'Cobranças de mensalidades escolares (requer ESCOLAR).',           icon: '💰' },
 };
 
 const SESSION_TTL_HOURS = 8;
@@ -146,7 +150,9 @@ router.use('/teacher-days', teacherDaysRoutes);
 router.use('/tutor-roles', tutorRolesRoutes);
 router.use('/lesson-types', lessonTypesRoutes);
 router.use('/licenses', licenseRoutes);
-router.use('/ponto', pontoRoutes);
+router.use('/ponto',      pontoRoutes);
+router.use('/escolar',    escolarRoutes);
+router.use('/financeiro', financeiroRoutes);
 
 // ─── Informações do servidor ─────────────────────────────────────────────────
 router.get('/app/dataPath', (req, res) => {
@@ -1431,7 +1437,10 @@ router.get('/substitutions', requireAuth, async (req, res) => {
     const schoolId = intParam(req.query.schoolId) || req.adminSession?.school_id;
     if (!schoolId) return fail(res, 'schoolId obrigatório.');
     const q = getDb()('teacher_substitutions').where({ school_id: schoolId }).orderBy('date', 'desc').limit(100);
-    if (req.query.date) q.where({ date: req.query.date });
+    if (req.query.date) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) return fail(res, 'Formato de data inválido. Use YYYY-MM-DD.');
+      q.where({ date: req.query.date });
+    }
     const rows = await q.select('*');
 
     // Enriquecer com nomes
@@ -1525,7 +1534,11 @@ router.get('/calendar', requireAuth, async (req, res) => {
     const schoolId = intParam(req.query.schoolId) || req.adminSession?.school_id;
     if (!schoolId) return fail(res, 'schoolId obrigatório.');
     const q = getDb()('academic_calendar').where({ school_id: schoolId }).orderBy('date');
-    if (req.query.year) q.where('date', '>=', `${req.query.year}-01-01`).where('date', '<=', `${req.query.year}-12-31`);
+    const calYear = intParam(req.query.year);
+    if (calYear) {
+      if (calYear < 2000 || calYear > 2100) return fail(res, 'Ano inválido.');
+      q.where('date', '>=', `${calYear}-01-01`).where('date', '<=', `${calYear}-12-31`);
+    }
     ok(res, await q.select('*'));
   } catch (e) { fail(res, e.message, 500); }
 });
@@ -1670,12 +1683,16 @@ router.get('/reports/schedule/:scheduleId', requireAuth, async (req, res) => {
 router.get('/reports/ponto-monthly', requireAuth, async (req, res) => {
   try {
     const schoolId = intParam(req.query.schoolId) || req.adminSession?.school_id;
-    const year  = req.query.year  || new Date().getFullYear();
-    const month = req.query.month || String(new Date().getMonth() + 1).padStart(2, '0');
+    const yearNum  = intParam(req.query.year)  || new Date().getFullYear();
+    const monthNum = intParam(req.query.month) || (new Date().getMonth() + 1);
     if (!schoolId) return fail(res, 'schoolId obrigatório.');
+    if (yearNum < 2000 || yearNum > 2100) return fail(res, 'Ano inválido.');
+    if (monthNum < 1   || monthNum > 12)  return fail(res, 'Mês inválido (1-12).');
 
-    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-    const endDate   = new Date(year, month, 0).toISOString().slice(0, 10);
+    const year  = String(yearNum);
+    const month = String(monthNum).padStart(2, '0');
+    const startDate = `${year}-${month}-01`;
+    const endDate   = new Date(yearNum, monthNum, 0).toISOString().slice(0, 10);
 
     const [employees, records] = await Promise.all([
       getDb()('ponto_employees').where({ school_id: schoolId, active: true }).orderBy('name').select('id', 'name', 'registration'),

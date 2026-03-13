@@ -1,17 +1,18 @@
 /**
  * data-provider.js
  *
- * Abstração da camada de dados. O código dos módulos nunca acessa
- * Supabase diretamente — sempre usa esta interface.
+ * Abstração da camada de dados. O frontend NUNCA acessa o Supabase
+ * diretamente. Todo contato com o banco de dados ocorre exclusivamente
+ * via HTTP → motor Express no Fly.io → database-web.js → Supabase.
  *
- * O provider concreto (SupabaseProvider / ApiProvider) deve ser implementado
- * em src/renderer/data/supabase-provider.js e registrado em init().
+ * Fluxo obrigatório:
+ *   Módulo → window.DB → window.aula (web-bridge) → /api/* → Fly.io → Supabase
  */
 
 class DataProvider {
   constructor() {
     this._provider = null;
-    this._mode = null; // 'local' | 'supabase'
+    this._mode = null; // sempre 'api' — via motor Fly.io
   }
 
   /**
@@ -38,7 +39,8 @@ class DataProvider {
   }
 
   get mode() { return this._mode; }
-  get isCloud() { return this._mode === 'supabase'; }
+  /** Sempre true — único modo suportado é via API (Fly.io → Supabase). */
+  get isCloud() { return true; }
 
   // ─── Delegação para o provider ativo ─────────────────────────────────────
 
@@ -206,23 +208,6 @@ class DataProvider {
   getPontoSettings(schoolId)        { return this._provider.getPontoSettings(schoolId); }
   updatePontoSettings(data)         { return this._provider.updatePontoSettings(data); }
 }
-
-/**
- * ─── SupabaseProvider (a implementar) ──────────────────────────────────────
- *
- * Criar src/renderer/data/supabase-provider.js implementando todos os métodos
- * do DataProvider usando o cliente @supabase/supabase-js. Exemplo:
- *
- *   async getSchools() {
- *     const { data, error } = await supabase.from('schools').select('*');
- *     if (error) throw error;
- *     return data;
- *   }
- *
- * Registrar no DataProvider.init():
- *   this._provider = new SupabaseProvider(config);
- *   this._mode = 'supabase';
- */
 
 // Exporta instância singleton
 window.DB = new DataProvider();

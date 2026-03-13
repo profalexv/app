@@ -277,6 +277,60 @@
     // ── Notificações Push ─────────────────────────────────────────────────────
     sendNotificationToTeacher: (teacherId, data) => post(`/notifications/teacher/${teacherId}`, data),
     broadcastNotification: (data) => post('/notifications/broadcast', data),
+
+    // ── Addon ESCOLAR ────────────────────────────────────────────────────
+    getEscolarStatus:      (schoolId) => get(`/escolar/status?schoolId=${schoolId}`),
+    subscribeEscolar:      (data)     => post('/escolar/subscribe', data),
+    cancelEscolar:         (data)     => post('/escolar/cancel', data),
+    // Alunos
+    getEscolarStudents:    (schoolId, classId) => get(`/escolar/students?schoolId=${schoolId}${classId ? `&classId=${classId}` : ''}`),
+    createEscolarStudent:  (data)     => post('/escolar/students', data),
+    updateEscolarStudent:  (id, data) => put(`/escolar/students/${id}`, data),
+    deleteEscolarStudent:  (id)       => del(`/escolar/students/${id}`),
+    // Matrículas
+    enrollStudent:         (data)     => post('/escolar/enrollments', data),
+    unenrollStudent:       (id)       => del(`/escolar/enrollments/${id}`),
+    // Chamada / Diário
+    getAttendance:         (schoolId, classId, date) => get(`/escolar/attendance?schoolId=${schoolId}${classId ? `&classId=${classId}` : ''}${date ? `&date=${date}` : ''}`),
+    getStudentAttendance:  (studentId, schoolId)     => get(`/escolar/attendance/student/${studentId}?schoolId=${schoolId}`),
+    saveAttendance:        (data)     => post('/escolar/attendance', data),
+    deleteAttendance:      (id)       => del(`/escolar/attendance/${id}`),
+    // Ocorrências
+    getOccurrences:        (schoolId, params = {}) => {
+      const qs = new URLSearchParams({ schoolId, ...params }).toString();
+      return get(`/escolar/occurrences?${qs}`);
+    },
+    createOccurrence:      (data)     => post('/escolar/occurrences', data),
+    updateOccurrence:      (id, data) => put(`/escolar/occurrences/${id}`, data),
+    deleteOccurrence:      (id)       => del(`/escolar/occurrences/${id}`),
+
+    // ── Addon FINANCEIRO ────────────────────────────────────────────────────
+    getFinanceiroStatus:          (schoolId) => get(`/financeiro/status?schoolId=${schoolId}`),
+    subscribeFinanceiro:          (data)     => post('/financeiro/subscribe', data),
+    cancelFinanceiro:             (data)     => post('/financeiro/cancel', data),
+    // Gateways
+    getFinanceiroGateways:        (schoolId) => get(`/financeiro/gateways?schoolId=${schoolId}`),
+    createFinanceiroGateway:      (data)     => post('/financeiro/gateways', data),
+    updateFinanceiroGateway:      (id, data) => put(`/financeiro/gateways/${id}`, data),
+    deleteFinanceiroGateway:      (id, schoolId) => del(`/financeiro/gateways/${id}?schoolId=${schoolId}`),
+    // Planos
+    getFinanceiroPlans:           (schoolId) => get(`/financeiro/plans?schoolId=${schoolId}`),
+    createFinanceiroPlan:         (data)     => post('/financeiro/plans', data),
+    updateFinanceiroPlan:         (id, data) => put(`/financeiro/plans/${id}`, data),
+    deleteFinanceiroPlan:         (id, schoolId) => del(`/financeiro/plans/${id}?schoolId=${schoolId}`),
+    // Contratos
+    getFinanceiroContracts:       (params)   => get(`/financeiro/contracts?${new URLSearchParams(params)}`),
+    createFinanceiroContract:     (data)     => post('/financeiro/contracts', data),
+    updateFinanceiroContract:     (id, data) => put(`/financeiro/contracts/${id}`, data),
+    // Faturas
+    getFinanceiroInvoices:        (params)   => get(`/financeiro/invoices?${new URLSearchParams(params)}`),
+    getFinanceiroInvoicesSummary: (schoolId, month) => get(`/financeiro/invoices/summary?schoolId=${schoolId}${month ? `&month=${month}` : ''}`),
+    generateFinanceiroInvoices:   (data)     => post('/financeiro/invoices/generate', data),
+    chargeFinanceiroInvoice:      (id, data) => post(`/financeiro/invoices/${id}/charge`, data),
+    updateFinanceiroInvoice:      (id, data) => put(`/financeiro/invoices/${id}`, data),
+    // Negociações
+    getFinanceiroNegotiations:    (schoolId) => get(`/financeiro/negotiations?schoolId=${schoolId}`),
+    createFinanceiroNegotiation:  (data)     => post('/financeiro/negotiations', data),
   };
 
   console.log('[web-bridge] window.aula configurado via HTTP →', API_BASE);
