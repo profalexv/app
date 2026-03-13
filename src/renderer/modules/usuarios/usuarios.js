@@ -148,12 +148,12 @@ window.UserManagementModule = (() => {
     const bodyHtml = `
       <form id="form-func-dynamic" class="form">
         <div class="form-group">
-          <label>Nome da função *</label>
-          <input type="text" name="name" required placeholder="Ex: Segurança, Cozinheiro(a)..." value="${isEditing ? E(func.name) : ''}">
+          <label for="func-name">Nome da função *</label>
+          <input type="text" id="func-name" name="name" required placeholder="Ex: Segurança, Cozinheiro(a)..." value="${isEditing ? E(func.name) : ''}">
         </div>
         <div class="form-group">
-          <label>Categoria *</label>
-          <select name="category" required>
+          <label for="func-category">Categoria *</label>
+          <select id="func-category" name="category" required>
             <option value="pedagogico" ${isEditing && func.category === 'pedagogico' ? 'selected' : ''}>Pedagógico</option>
             <option value="administrativo" ${!isEditing || func.category === 'administrativo' ? 'selected' : ''}>Administrativo</option>
             <option value="operacional" ${isEditing && func.category === 'operacional' ? 'selected' : ''}>Operacional</option>
@@ -263,20 +263,20 @@ window.UserManagementModule = (() => {
     const bodyHtml = `
       <form id="form-person-dynamic" class="form">
         <div class="form-group">
-          <label>Nome Completo *</label>
-          <input type="text" name="name" required placeholder="Nome completo" value="${isEditing ? E(person.name) : ''}">
+          <label for="person-name">Nome Completo *</label>
+          <input type="text" id="person-name" name="name" required placeholder="Nome completo" value="${isEditing ? E(person.name) : ''}">
         </div>
         <div class="form-group">
-          <label>Matrícula (opcional)</label>
-          <input type="text" name="registration" placeholder="Número de matrícula" value="${isEditing && person.registration ? E(person.registration) : ''}">
+          <label for="person-reg">Matrícula (opcional)</label>
+          <input type="text" id="person-reg" name="registration" placeholder="Número de matrícula" value="${isEditing && person.registration ? E(person.registration) : ''}">
         </div>
         <div class="form-group">
-          <label>E-mail (opcional)</label>
-          <input type="email" name="email" placeholder="email@escola.edu" value="${isEditing && person.email ? E(person.email) : ''}">
+          <label for="person-email">E-mail (opcional)</label>
+          <input type="email" id="person-email" name="email" placeholder="email@escola.edu" value="${isEditing && person.email ? E(person.email) : ''}">
         </div>
         <div class="form-group">
-          <label>Telefone (opcional)</label>
-          <input type="tel" name="phone" placeholder="(xx) 9xxxx-xxxx" value="${isEditing && person.phone ? E(person.phone) : ''}">
+          <label for="person-phone">Telefone (opcional)</label>
+          <input type="tel" id="person-phone" name="phone" placeholder="(xx) 9xxxx-xxxx" value="${isEditing && person.phone ? E(person.phone) : ''}">
         </div>
         <div class="form-error"></div>
       </form>

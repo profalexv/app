@@ -167,38 +167,74 @@ window.showToast = function(message, type = 'info', duration = 3500) {
 
 // ─── Modal utilitário ─────────────────────────────────────────────────────────
 window.openModal = function({ title, bodyHtml, onConfirm, confirmLabel = 'Salvar', confirmClass = 'btn-primary', size = 'normal' }) {
+  const previouslyFocused = document.activeElement;
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
+  const modalId = `modal-${Date.now()}`;
+
   overlay.innerHTML = `
-    <div class="modal ${size === 'large' ? 'large' : ''}" role="dialog" aria-modal="true">
+    <div id="${modalId}" class="modal ${size === 'large' ? 'large' : ''}" role="dialog" aria-modal="true" aria-labelledby="${modalId}-title">
       <div class="modal-header">
-        <h3>${title}</h3>
+        <h3 id="${modalId}-title">${title}</h3>
         <button class="modal-close" aria-label="Fechar">✕</button>
       </div>
       <div class="modal-body">${bodyHtml}</div>
       <div class="modal-footer">
-        <button class="btn btn-ghost" id="modal-cancel">Cancelar</button>
-        <button class="btn ${confirmClass}" id="modal-confirm">${confirmLabel}</button>
+        <button class="btn btn-ghost modal-cancel">Cancelar</button>
+        <button class="btn ${confirmClass} modal-confirm">${confirmLabel}</button>
       </div>
     </div>
   `;
 
   document.body.appendChild(overlay);
 
-  const close = () => overlay.remove();
+  const modal = overlay.querySelector('.modal');
+  const focusableElements = modal.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+  const firstFocusable = focusableElements[0];
+  const lastFocusable = focusableElements[focusableElements.length - 1];
+
+  const close = () => {
+    overlay.remove();
+    previouslyFocused?.focus();
+    document.removeEventListener('keydown', handleKeydown);
+  };
+
+  const handleKeydown = (e) => {
+    if (e.key === 'Escape') {
+      close();
+      return;
+    }
+    if (e.key === 'Tab' && modal.contains(document.activeElement)) {
+      if (e.shiftKey) { // Shift + Tab
+        if (document.activeElement === firstFocusable) {
+          lastFocusable.focus();
+          e.preventDefault();
+        }
+      } else { // Tab
+        if (document.activeElement === lastFocusable) {
+          firstFocusable.focus();
+          e.preventDefault();
+        }
+      }
+    }
+  };
 
   overlay.querySelector('.modal-close').addEventListener('click', close);
-  overlay.querySelector('#modal-cancel').addEventListener('click', close);
+  overlay.querySelector('.modal-cancel').addEventListener('click', close);
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
-  overlay.querySelector('#modal-confirm').addEventListener('click', () => {
+  overlay.querySelector('.modal-confirm').addEventListener('click', () => {
     onConfirm(overlay, close);
   });
 
-  // Foco no primeiro input
+  document.addEventListener('keydown', handleKeydown);
+
+  // Foco no primeiro elemento focável
   setTimeout(() => {
-    const first = overlay.querySelector('input, select, textarea');
-    if (first) first.focus();
+    (firstFocusable || modal).focus();
   }, 50);
 
   return overlay;

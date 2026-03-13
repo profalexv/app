@@ -26,14 +26,14 @@ window.ModuleCalendario = (() => {
   async function mount(container) {
     const year = new Date().getFullYear();
     container.innerHTML = `
-      <div style="padding:24px;overflow-y:auto;height:100%">
-        <div class="page-header" style="margin-bottom:20px">
+      <div class="calendar-module module-container">
+        <div class="page-header">
           <div>
-            <h1 style="margin:0;font-size:22px">📆 Calendário Acadêmico</h1>
-            <p class="subtitle" style="margin:4px 0 0">Feriados, eventos, reposições e recessos</p>
+            <h1>📆 Calendário Acadêmico</h1>
+            <p class="subtitle">Feriados, eventos, reposições e recessos</p>
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <select id="cal-year" class="form-control" style="width:100px">
+          <div class="page-header-actions">
+            <select id="cal-year" class="form-control year-selector">
               ${[year-1, year, year+1].map(y => `<option value="${y}" ${y===year?'selected':''}>${y}</option>`).join('')}
             </select>
             <button class="btn btn-primary" id="btn-novo-evento">+ Novo Evento</button>
@@ -43,42 +43,42 @@ window.ModuleCalendario = (() => {
       </div>
 
       <!-- Modal novo/editar evento -->
-      <div id="modal-evento" class="modal-overlay" style="display:none">
+      <div id="modal-evento" class="modal-overlay" style="display:none;">
         <div class="modal large" role="dialog">
           <div class="modal-header"><h3 id="evento-modal-title">Novo Evento</h3><button class="modal-close">✕</button></div>
           <div class="modal-body">
             <input type="hidden" id="evento-id">
             <div class="form-row">
               <div class="form-group">
-                <label>Tipo *</label>
-                <select id="evento-type" class="form-control">
+                <label for="evento-type">Tipo *</label>
+                <select id="evento-type" name="type" class="form-control">
                   ${Object.entries(TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
                 </select>
               </div>
               <div class="form-group">
-                <label>Data *</label>
-                <input type="date" id="evento-date" class="form-control" required>
+                <label for="evento-date">Data *</label>
+                <input type="date" id="evento-date" name="date" class="form-control" required>
               </div>
               <div class="form-group">
-                <label>Data final (opcional)</label>
-                <input type="date" id="evento-end-date" class="form-control">
+                <label for="evento-end-date">Data final (opcional)</label>
+                <input type="date" id="evento-end-date" name="end_date" class="form-control">
               </div>
             </div>
             <div class="form-group">
-              <label>Título *</label>
-              <input type="text" id="evento-title" class="form-control" placeholder="Ex: Feriado Municipal" required>
+              <label for="evento-title">Título *</label>
+              <input type="text" id="evento-title" name="title" class="form-control" placeholder="Ex: Feriado Municipal" required>
             </div>
             <div class="form-group">
-              <label>Descrição</label>
-              <textarea id="evento-desc" class="form-control" rows="2" placeholder="Detalhes adicionais..."></textarea>
+              <label for="evento-desc">Descrição</label>
+              <textarea id="evento-desc" name="description" class="form-control" rows="2" placeholder="Detalhes adicionais..."></textarea>
             </div>
             <div class="form-group">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-                <input type="checkbox" id="evento-affects" checked>
+              <label for="evento-affects" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="evento-affects" name="affects_classes" checked>
                 Afeta aulas (dia letivo é cancelado/alterado)
               </label>
             </div>
-            <div id="evento-error" style="color:#dc2626;font-size:13px"></div>
+            <div id="evento-error" class="form-error"></div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-ghost" id="evento-cancel">Cancelar</button>
@@ -109,7 +109,7 @@ window.ModuleCalendario = (() => {
       const events = await window.aula.getCalendar(_schoolId, year);
       renderCalendar(events, year);
     } catch (e) {
-      content.innerHTML = `<p style="color:#dc2626">Erro: ${E(e.message)}</p>`;
+      content.innerHTML = `<p class="error-message">Erro: ${E(e.message)}</p>`;
     }
   }
 
@@ -124,27 +124,27 @@ window.ModuleCalendario = (() => {
 
     const content = document.getElementById('cal-content');
     if (!events.length) {
-      content.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280">Nenhum evento cadastrado para este ano.</div>';
+      content.innerHTML = '<div class="empty-state">Nenhum evento cadastrado para este ano.</div>';
       return;
     }
 
     content.innerHTML = Object.entries(byMonth).map(([monthIdx, evs]) => `
-      <div style="background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)">
-        <h3 style="margin:0 0 16px;font-size:15px;color:#374151">${MONTHS[monthIdx]}</h3>
+      <div class="calendar-month-group">
+        <h3 class="calendar-month-title">${MONTHS[monthIdx]}</h3>
         ${evs.map(ev => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6">
-            <div style="display:flex;gap:12px;align-items:center">
-              <div style="width:60px;text-align:right;font-size:12px;color:#6b7280;font-weight:600">
+          <div class="calendar-event-row">
+            <div class="calendar-event-info">
+              <div class="calendar-event-date">
                 ${ev.date.slice(8)}${ev.end_date && ev.end_date !== ev.date ? `–${ev.end_date.slice(8)}` : ''}
               </div>
               <div>
                 ${typeBadge(ev.type)}
-                <div style="font-size:14px;font-weight:500;margin-top:4px">${E(ev.title)}</div>
-                ${ev.description ? `<div style="font-size:12px;color:#6b7280">${E(ev.description)}</div>` : ''}
-                ${ev.affects_classes === false ? '<div style="font-size:11px;color:#6b7280">Não afeta aulas</div>' : ''}
+                <div class="event-title">${E(ev.title)}</div>
+                ${ev.description ? `<div class="event-description">${E(ev.description)}</div>` : ''}
+                ${ev.affects_classes === false ? '<div class="event-meta">Não afeta aulas</div>' : ''}
               </div>
             </div>
-            <div style="display:flex;gap:4px">
+            <div class="event-actions">
               <button class="btn btn-sm btn-ghost ev-edit-btn" data-id="${ev.id}" title="Editar">✏️</button>
               <button class="btn btn-sm btn-ghost ev-delete-btn" data-id="${ev.id}" title="Excluir">✕</button>
             </div>

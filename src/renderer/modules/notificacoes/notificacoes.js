@@ -5,36 +5,55 @@
 
 window.ModuleNotificacoes = (() => {
   let _schoolId = null;
-  const E = 
+  const E = window._esc;
   async function mount(container) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-secondary)">Carregando professores…</div>';
+
     let teachers = [];
     try { teachers = await window.aula.getTeachers(_schoolId); } catch (_) {}
 
-    const teacherOptions = teachers
-      .filter(t => t.active)
+    const activeTeachers = teachers.filter(t => t.active);
+
+    const teacherOptions = activeTeachers
       .map(t => `<option value="${E(t.id)}">${E(t.name)}</option>`)
       .join('');
 
+    if (activeTeachers.length === 0) {
+      container.innerHTML = `
+        <div class="module-container" style="max-width:700px">
+          <div class="page-header" style="margin-bottom:24px;">
+            <div>
+              <h1>🔔 Notificações Push</h1>
+              <p class="subtitle">Envie avisos aos professores via notificação no dispositivo</p>
+            </div>
+          </div>
+          <div class="empty-state" style="padding:48px 24px;text-align:center;background:var(--bg-secondary,#f8f9fa);border-radius:8px;border:1px dashed var(--border-color,#dee2e6)">
+            <div style="font-size:48px;margin-bottom:16px">🔕</div>
+            <h3 style="margin:0 0 8px;color:var(--text-primary)">Nenhum professor ativo</h3>
+            <p style="margin:0;color:var(--text-secondary)">Cadastre professores em <strong>Usuários</strong> para poder enviar notificações.</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     container.innerHTML = `
-      <div style="padding:24px;overflow-y:auto;height:100%;max-width:700px">
-        <div class="page-header" style="margin-bottom:24px">
+      <div class="module-container" style="max-width:700px">
+        <div class="page-header" style="margin-bottom:24px;">
           <div>
-            <h1 style="margin:0;font-size:22px">🔔 Notificações Push</h1>
-            <p class="subtitle" style="margin:4px 0 0">Envie avisos aos professores via notificação no dispositivo</p>
+            <h1>🔔 Notificações Push</h1>
+            <p class="subtitle">Envie avisos aos professores via notificação no dispositivo</p>
           </div>
         </div>
 
         <!-- Status do service worker -->
-        <div id="sw-status" style="
-          padding:12px 16px;border-radius:8px;margin-bottom:24px;
-          background:#f3f4f6;font-size:13px;color:#6b7280
-        ">
+        <div id="sw-status" class="sw-status">
           Verificando suporte a notificações push...
         </div>
 
         <!-- Envio avulso para professor específico -->
-        <div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)">
-          <h3 style="margin:0 0 16px;font-size:15px">📤 Notificação para Professor Específico</h3>
+        <div class="notification-panel">
+          <h3 class="panel-title">📤 Notificação para Professor Específico</h3>
           <div class="form-group">
             <label>Professor</label>
             <select id="notif-teacher" class="form-control">
@@ -50,15 +69,15 @@ window.ModuleNotificacoes = (() => {
             <label>Mensagem *</label>
             <textarea id="notif-body-single" class="form-control" rows="2" placeholder="Texto da notificação..." maxlength="250"></textarea>
           </div>
-          <div id="notif-single-error" style="color:#dc2626;font-size:13px;min-height:16px"></div>
-          <div style="display:flex;justify-content:flex-end;margin-top:12px">
+          <div id="notif-single-error" class="form-error" style="min-height:16px"></div>
+          <div class="form-actions">
             <button class="btn btn-primary" id="btn-send-single">Enviar para Professor</button>
           </div>
         </div>
 
         <!-- Broadcast para todos os professores -->
-        <div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)">
-          <h3 style="margin:0 0 16px;font-size:15px">📣 Broadcast — Todos os Professores</h3>
+        <div class="notification-panel">
+          <h3 class="panel-title">📣 Broadcast — Todos os Professores</h3>
           <div class="form-group">
             <label>Título *</label>
             <input type="text" id="notif-title-broad" class="form-control" placeholder="Ex: Reunião amanhã às 18h" maxlength="100">
@@ -67,16 +86,16 @@ window.ModuleNotificacoes = (() => {
             <label>Mensagem *</label>
             <textarea id="notif-body-broad" class="form-control" rows="2" placeholder="Texto do aviso..." maxlength="250"></textarea>
           </div>
-          <div id="notif-broad-error" style="color:#dc2626;font-size:13px;min-height:16px"></div>
-          <div style="display:flex;justify-content:flex-end;margin-top:12px">
+          <div id="notif-broad-error" class="form-error" style="min-height:16px"></div>
+          <div class="form-actions">
             <button class="btn btn-primary" id="btn-send-broad">Enviar para Todos</button>
           </div>
         </div>
 
         <!-- Instruções para o professor ativar -->
-        <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)">
-          <h3 style="margin:0 0 12px;font-size:15px">ℹ️ Como funciona</h3>
-          <ul style="font-size:13px;color:#374151;line-height:1.8;padding-left:20px">
+        <div class="info-panel notification-panel">
+          <h3 class="panel-title">ℹ️ Como funciona</h3>
+          <ul>
             <li>Os professores precisam acessar o <strong>aula.app</strong> e autorizar notificações no navegador.</li>
             <li>Após autorizar, recebem notificações mesmo com o app fechado.</li>
             <li>Você pode enviar avisos individualmente ou para todos de uma vez.</li>
@@ -90,30 +109,23 @@ window.ModuleNotificacoes = (() => {
     const swStatus = document.getElementById('sw-status');
     if ('Notification' in window && 'serviceWorker' in navigator) {
       const perm = Notification.permission;
+      swStatus.classList.remove('sw-status--granted', 'sw-status--denied', 'sw-status--default');
       if (perm === 'granted') {
-        swStatus.style.background = '#d1fae5';
-        swStatus.style.color = '#16a34a';
+        swStatus.classList.add('sw-status--granted');
         swStatus.textContent = '✓ Notificações push ativas neste dispositivo.';
       } else if (perm === 'denied') {
-        swStatus.style.background = '#fee2e2';
-        swStatus.style.color = '#dc2626';
+        swStatus.classList.add('sw-status--denied');
         swStatus.textContent = '✗ Notificações bloqueadas neste dispositivo. Verifique as configurações do navegador.';
       } else {
-        swStatus.style.background = '#fef3c7';
-        swStatus.style.color = '#d97706';
+        swStatus.classList.add('sw-status--default');
         swStatus.innerHTML = '⚠️ Notificações não autorizadas. <button class="btn btn-sm btn-ghost" id="btn-request-perm" style="margin-left:8px">Autorizar</button>';
         document.getElementById('btn-request-perm')?.addEventListener('click', async () => {
           const perm = await Notification.requestPermission();
-          if (perm === 'granted') {
-            swStatus.style.background = '#d1fae5';
-            swStatus.style.color = '#16a34a';
-            swStatus.textContent = '✓ Notificações push ativas neste dispositivo.';
-          }
+          mount(container); // Recarrega o status
         });
       }
     } else {
-      swStatus.style.background = '#fee2e2';
-      swStatus.style.color = '#dc2626';
+      swStatus.classList.add('sw-status--denied');
       swStatus.textContent = '✗ Seu navegador não suporta notificações push.';
     }
 

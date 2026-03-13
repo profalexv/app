@@ -130,3 +130,176 @@
   min-width: 0;
   border-left: 4px solid var(--card-color, #3B6FD4);
 }
+
+/* Módulo: Auditoria */
+.audit-module .page-header {
+  margin-bottom: 20px;
+}
+
+.audit-module .page-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.audit-module .page-header-actions .form-control {
+  width: 120px;
+}
+
+.audit-module .filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.audit-module .filter-bar .form-control {
+  width: 220px;
+}
+
+.audit-table-wrapper {
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.audit-table thead tr {
+  background: #f8fafc;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.audit-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.audit-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.audit-table td {
+  padding: 10px 16px;
+}
+
+.audit-table .col-date {
+  white-space: nowrap;
+  color: #6b7280;
+}
+
+.audit-table .col-entity {
+  color: #374151;
+}
+
+.audit-table .col-details {
+  color: #6b7280;
+  font-size: 12px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-table-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* Módulo: Calendário */
+.calendar-module .page-header {
+  margin-bottom: 20px;
+}
+
+.calendar-module .year-selector {
+  width: 100px;
+}
+
+.calendar-month-group {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+.calendar-month-title {
+  margin: 0 0 16px;
+  font-size: 15px;
+  color: #374151;
+}
+
+.calendar-event-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.calendar-event-info {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.calendar-event-date {
+  width: 60px;
+  text-align: right;
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.event-title { font-size: 14px; font-weight: 500; margin-top: 4px; }
+.event-description { font-size: 12px; color: #6b7280; }
+.event-meta { font-size: 11px; color: #6b7280; }
+.event-actions { display: flex; gap: 4px; }
+
+/* Módulo: Notificações */
+.notification-panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+.notification-panel .panel-title {
+  margin: 0 0 16px;
+  font-size: 15px;
+}
+
+.notification-panel .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.info-panel ul {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.8;
+  padding-left: 20px;
+  margin: 0;
+}
+
+.sw-status {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  background: #f3f4f6;
+  font-size: 13px;
+  color: #6b7280;
+}
+.sw-status.sw-status--granted { background: #d1fae5; color: #16a34a; }
+.sw-status.sw-status--denied { background: #fee2e2; color: #dc2626; }
+.sw-status.sw-status--default { background: #fef3c7; color: #d97706; }

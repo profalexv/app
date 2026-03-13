@@ -92,15 +92,15 @@ window.ModuleSubstituicoes = (() => {
           <div class="modal-body">
             <div class="form-row">
               <div class="form-group">
-                <label>Professor Ausente *</label>
-                <select id="sub-original" class="form-control" required>
+                <label for="sub-original">Professor Ausente *</label>
+                <select id="sub-original" name="original_teacher_id" class="form-control" required>
                   <option value="">Selecione...</option>
                   ${teacherOptions}
                 </select>
               </div>
               <div class="form-group">
-                <label>Substituto</label>
-                <select id="sub-substitute" class="form-control">
+                <label for="sub-substitute">Substituto</label>
+                <select id="sub-substitute" name="substitute_teacher_id" class="form-control">
                   <option value="">A definir</option>
                   ${teacherOptions}
                 </select>
@@ -108,31 +108,31 @@ window.ModuleSubstituicoes = (() => {
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Data *</label>
-                <input type="date" id="sub-date" class="form-control" value="${new Date().toISOString().slice(0,10)}" required>
+                <label for="sub-date">Data *</label>
+                <input type="date" id="sub-date" name="date" class="form-control" value="${new Date().toISOString().slice(0,10)}" required>
               </div>
               <div class="form-group">
-                <label>Dia da Semana *</label>
-                <select id="sub-weekday" class="form-control">
+                <label for="sub-weekday">Dia da Semana *</label>
+                <select id="sub-weekday" name="weekday" class="form-control">
                   ${WEEKDAY_LABELS.map((d,i) => `<option value="${i}">${d}</option>`)}
                 </select>
               </div>
               <div class="form-group">
-                <label>Período *</label>
-                <input type="number" id="sub-period" class="form-control" min="1" max="10" value="1" required>
+                <label for="sub-period">Período *</label>
+                <input type="number" id="sub-period" name="period" class="form-control" min="1" max="10" value="1" required>
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Disciplina</label>
-                <input type="text" id="sub-subject" class="form-control" placeholder="Ex: Matemática">
+                <label for="sub-subject">Disciplina</label>
+                <input type="text" id="sub-subject" name="subject" class="form-control" placeholder="Ex: Matemática">
               </div>
             </div>
             <div class="form-group">
-              <label>Observações</label>
-              <textarea id="sub-notes" class="form-control" rows="2" placeholder="Informações adicionais..."></textarea>
+              <label for="sub-notes">Observações</label>
+              <textarea id="sub-notes" name="notes" class="form-control" rows="2" placeholder="Informações adicionais..."></textarea>
             </div>
-            <div id="sub-error" style="color:#dc2626;font-size:13px;margin-top:4px"></div>
+            <div id="sub-error" class="form-error" style="min-height:16px"></div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-ghost" id="sub-modal-cancel">Cancelar</button>
@@ -148,8 +148,8 @@ window.ModuleSubstituicoes = (() => {
           <div class="modal-body">
             <input type="hidden" id="assign-sub-id">
             <div class="form-group">
-              <label>Substituto *</label>
-              <select id="assign-teacher" class="form-control">
+              <label for="assign-teacher">Substituto *</label>
+              <select id="assign-teacher" name="teacher_id" class="form-control">
                 <option value="">Selecione...</option>
                 ${teacherOptions}
               </select>

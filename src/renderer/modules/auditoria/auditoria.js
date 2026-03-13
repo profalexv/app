@@ -30,14 +30,14 @@ window.ModuleAuditoria = (() => {
 
   async function mount(container) {
     container.innerHTML = `
-      <div style="padding:24px;overflow-y:auto;height:100%">
-        <div class="page-header" style="margin-bottom:20px">
+      <div class="audit-module module-container">
+        <div class="page-header">
           <div>
-            <h1 style="margin:0;font-size:22px">🔐 Auditoria LGPD</h1>
-            <p class="subtitle" style="margin:4px 0 0">Histórico de ações para conformidade LGPD</p>
+            <h1>🔐 Auditoria LGPD</h1>
+            <p class="subtitle">Histórico de ações para conformidade LGPD</p>
           </div>
-          <div style="display:flex;gap:8px">
-            <select id="audit-limit" class="form-control" style="width:120px">
+          <div class="page-header-actions">
+            <select id="audit-limit" class="form-control">
               <option value="50">50 registros</option>
               <option value="100">100 registros</option>
               <option value="200">200 registros</option>
@@ -47,8 +47,8 @@ window.ModuleAuditoria = (() => {
         </div>
 
         <!-- Filtros -->
-        <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-          <input type="text" id="audit-search" class="form-control" style="width:220px" placeholder="Filtrar por ação ou entidade...">
+        <div class="filter-bar">
+          <input type="text" id="audit-search" class="form-control" placeholder="Filtrar por ação ou entidade...">
         </div>
 
         <div id="audit-list">
@@ -74,7 +74,7 @@ window.ModuleAuditoria = (() => {
       _allRows = await window.aula.getAuditLog(_schoolId, limit);
       renderRows(_allRows);
     } catch (e) {
-      listEl.innerHTML = `<p style="color:#dc2626;padding:20px">Erro ao carregar auditoria: ${E(e.message)}</p>`;
+      listEl.innerHTML = `<p class="error-message">Erro ao carregar auditoria: ${E(e.message)}</p>`;
     }
   }
 
@@ -91,44 +91,43 @@ window.ModuleAuditoria = (() => {
   function renderRows(rows) {
     const listEl = document.getElementById('audit-list');
     if (!rows.length) {
-      listEl.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280">Nenhum registro de auditoria encontrado.</div>';
+      listEl.innerHTML = '<div class="empty-state">Nenhum registro de auditoria encontrado.</div>';
       return;
     }
 
     listEl.innerHTML = `
-      <div style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)">
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <div class="audit-table-wrapper">
+        <table class="audit-table">
           <thead>
-            <tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb">
-              <th style="padding:12px 16px;text-align:left;font-weight:600;white-space:nowrap">Data/Hora</th>
-              <th style="padding:12px 16px;text-align:left;font-weight:600">Usuário</th>
-              <th style="padding:12px 16px;text-align:left;font-weight:600">Ação</th>
-              <th style="padding:12px 16px;text-align:left;font-weight:600">Entidade</th>
-              <th style="padding:12px 16px;text-align:left;font-weight:600">Detalhe</th>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Usuário</th>
+              <th>Ação</th>
+              <th>Entidade</th>
+              <th>Detalhe</th>
             </tr>
           </thead>
           <tbody>
             ${rows.map(r => {
               const icon = ENTITY_ICONS[r.entity] || ENTITY_ICONS.default;
               const details = typeof r.details === 'object'
-                ? Object.entries(r.details).map(([k,v]) => `${k}: ${v}`).join(', ')
+                ? Object.entries(r.details).map(([k,v]) => `${k}: ${v}`).join('; ')
                 : '';
               return `
-                <tr style="border-bottom:1px solid #f0f0f0" class="audit-row">
-                  <td style="padding:10px 16px;white-space:nowrap;color:#6b7280">
+                <tr class="audit-row">
+                  <td class="col-date">
                     ${new Date(r.created_at).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}
                   </td>
-                  <td style="padding:10px 16px">${E(r.admin_name || '—')}</td>
-                  <td style="padding:10px 16px">${actionBadge(r.action)}</td>
-                  <td style="padding:10px 16px">${icon} <span style="color:#374151">${E(r.entity)}${r.entity_id ? ` #${r.entity_id}` : ''}</span></td>
-                  <td style="padding:10px 16px;color:#6b7280;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis"
-                      title="${E(details)}">${E(details)}</td>
+                  <td>${E(r.admin_name || '—')}</td>
+                  <td>${actionBadge(r.action)}</td>
+                  <td class="col-entity">${icon} <span>${E(r.entity)}${r.entity_id ? ` #${r.entity_id}` : ''}</span></td>
+                  <td class="col-details" title="${E(details)}">${E(details)}</td>
                 </tr>
               `;
             }).join('')}
           </tbody>
         </table>
-        <div style="padding:12px 16px;border-top:1px solid #f0f0f0;color:#6b7280;font-size:12px">
+        <div class="audit-table-footer">
           ${rows.length} registro(s) exibido(s)
         </div>
       </div>
