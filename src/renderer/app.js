@@ -83,8 +83,13 @@ const MODULES = {
       window.UserManagementModule.init(container, window.AppContext?.schoolId);
     }
   },
-  ponto:    { mount(c) { window.ModulePonto.mount(c); } },
-  licencas:   { mount(c) { window.LicenseManager.renderManagementScreen(c); } },
+  ponto:        { mount(c) { window.ModulePonto.mount(c); } },
+  dashboard:    window.ModuleDashboard,
+  substituicoes: window.ModuleSubstituicoes,
+  calendario:   window.ModuleCalendario,
+  notificacoes: window.ModuleNotificacoes,
+  auditoria:    window.ModuleAuditoria,
+  licencas:     { mount(c) { window.LicenseManager.renderManagementScreen(c); } },
 };
 
 let currentTab = 'cronograma';
@@ -440,6 +445,13 @@ function setupMainApp() {
       if (pontoTab) pontoTab.style.display = st?.active ? '' : 'none';
     })
     .catch(() => {});
+
+  // Exibe abas dos novos módulos (visíveis para todos os admins autenticados)
+  const newModuleTabs = ['dashboard', 'substituicoes', 'calendario', 'notificacoes', 'auditoria'];
+  newModuleTabs.forEach(name => {
+    const btn = document.querySelector(`.tab-btn[data-module="${name}"]`);
+    if (btn) btn.style.display = '';
+  });
 
   // Inicia verificação periódica de sessão
   if (window.__authManager) {

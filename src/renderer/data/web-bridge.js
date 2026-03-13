@@ -236,6 +236,47 @@
     // Configurações de assinatura por escola (eletrônico, físico, ou ambos)
     getPontoSettings:        (schoolId)  => get(`/ponto/settings?schoolId=${schoolId}`),
     updatePontoSettings:     (data)      => put('/ponto/settings', data),
+
+    // ── Dashboard ─────────────────────────────────────────────────────────────
+    getDashboard: (schoolId) => get(`/dashboard?schoolId=${schoolId}`),
+
+    // ── Auditoria LGPD ────────────────────────────────────────────────────────
+    getAuditLog: (schoolId, limit = 50) => get(`/audit?schoolId=${schoolId}&limit=${limit}`),
+
+    // ── Substituições ─────────────────────────────────────────────────────────
+    getSubstitutions: (schoolId, date = '') =>
+      get(`/substitutions?schoolId=${schoolId}${date ? `&date=${date}` : ''}`),
+    createSubstitution: (data) => post('/substitutions', data),
+    updateSubstitution: (id, data) => put(`/substitutions/${id}`, data),
+    deleteSubstitution: (id) => del(`/substitutions/${id}`),
+
+    // ── Calendário Acadêmico ──────────────────────────────────────────────────
+    getCalendar: (schoolId, year) => get(`/calendar?schoolId=${schoolId}&year=${year}`),
+    createCalendarEvent: (data) => post('/calendar', data),
+    updateCalendarEvent: (id, data) => put(`/calendar/${id}`, data),
+    deleteCalendarEvent: (id) => del(`/calendar/${id}`),
+
+    // ── Roles de Admins ───────────────────────────────────────────────────────
+    updateAdminRole: (id, role) => put(`/admins/${id}/role`, { role }),
+    getRolePermissions: () => get('/roles/permissions'),
+
+    // ── Portal do Professor ───────────────────────────────────────────────────
+    teacherPortalLogin: (data) => post('/teacher-portal/login', data),
+    setTeacherPortalPassword: (data) => post('/teacher-portal/set-password', data),
+    getTeacherPortalMe: () => get('/teacher-portal/me'),
+    getTeacherPortalSchedule: () => get('/teacher-portal/schedule'),
+    getTeacherPortalSubstitutions: () => get('/teacher-portal/substitutions'),
+    logoutTeacherPortal: () => post('/teacher-portal/logout', {}),
+
+    // ── Relatórios ────────────────────────────────────────────────────────────
+    getReportSchedule: (scheduleId) => get(`/reports/schedule/${scheduleId}`),
+    getReportPontoMonthly: (schoolId, year, month) =>
+      get(`/reports/ponto-monthly?schoolId=${schoolId}&year=${year}&month=${month}`),
+    getReportTeacherLoad: (scheduleId) => get(`/reports/teacher-load/${scheduleId}`),
+
+    // ── Notificações Push ─────────────────────────────────────────────────────
+    sendNotificationToTeacher: (teacherId, data) => post(`/notifications/teacher/${teacherId}`, data),
+    broadcastNotification: (data) => post('/notifications/broadcast', data),
   };
 
   console.log('[web-bridge] window.aula configurado via HTTP →', API_BASE);

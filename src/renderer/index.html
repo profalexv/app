@@ -39,6 +39,21 @@
       <button class="tab-btn tab-btn-ponto" data-module="ponto" title="Registro de Ponto" style="display:none">
         🕐 Ponto
       </button>
+      <button class="tab-btn tab-btn-dashboard" data-module="dashboard" title="Dashboard Analítico" style="display:none">
+        📊 Dashboard
+      </button>
+      <button class="tab-btn tab-btn-substituicoes" data-module="substituicoes" title="Substituições de Professores" style="display:none">
+        🔄 Substituições
+      </button>
+      <button class="tab-btn tab-btn-calendario" data-module="calendario" title="Calendário Acadêmico" style="display:none">
+        📆 Calendário
+      </button>
+      <button class="tab-btn tab-btn-notificacoes" data-module="notificacoes" title="Notificações Push" style="display:none">
+        🔔 Notificações
+      </button>
+      <button class="tab-btn tab-btn-auditoria" data-module="auditoria" title="Auditoria LGPD" style="display:none">
+        🔐 Auditoria
+      </button>
       <div class="tab-bar-spacer"></div>
       <button class="tab-btn tab-btn-icon" data-module="licencas" title="Gerenciar Licenças">🔑</button>
     </nav>
@@ -89,5 +104,10 @@
   <!-- Módulos dinâmicos (carregados após app.js para acesso a window.registerModule) -->
   <script src="modules/usuarios/usuarios.js"></script>
   <script src="modules/ponto/ponto.js"></script>
+  <script src="modules/dashboard/dashboard.js"></script>
+  <script src="modules/substituicoes/substituicoes.js"></script>
+  <script src="modules/calendario/calendario.js"></script>
+  <script src="modules/notificacoes/notificacoes.js"></script>
+  <script src="modules/auditoria/auditoria.js"></script>
 </body>
 </html>

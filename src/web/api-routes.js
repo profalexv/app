@@ -17,6 +17,11 @@ const { getDb, hashPassword, verifyPassword } = require('../db/database-web');
 const { isValidCredentials, isValidPositiveInt, isValidTeacherData, isValidSchoolData } = require('../utils/validators');
 const { SubscriptionManager } = require('../utils/subscription-manager');
 
+// Importando roteadores de entidades específicas
+const peopleRoutes = require('./routes/people.routes');
+const teacherRoutes = require('./routes/teachers.routes');
+const scheduleRoutes = require('./routes/schedules.routes');
+
 const AVAILABLE_MODULES = {
   cronograma: { id: 'cronograma', name: 'Cronograma',              description: 'Criação e gerenciamento de grades de horários escolares.',      icon: '📅' },
   aula:       { id: 'aula',       name: 'Registro de Aulas',       description: 'Registro e controle de aulas ministradas por professor.',        icon: '📝' },
@@ -47,7 +52,7 @@ const authLimiter = rateLimit({
 // As rotas abaixo ficam abertas: auth, webhooks, pagamentos, app professor.
 const PROTECTED_ROUTE_GROUPS = [
   '/schools', '/admins', '/teachers', '/schedules', '/lessons',
-  '/lesson-plans', '/resources', '/shifts', '/classes', '/curricula',
+  '/people', '/lesson-plans', '/resources', '/shifts', '/classes', '/curricula',
   '/time-slots', '/class-curricula', '/class-teacher-curricula',
   '/teacher-days', '/lesson-types', '/ponto',
 ];
@@ -112,6 +117,12 @@ router.use(['/auth/login', '/auth/register', '/auth/registerFirstAdmin'], authLi
 
 // ─── Aplicar autenticação nas rotas de dados ─────────────────────────────────
 router.use(PROTECTED_ROUTE_GROUPS, requireAuth);
+
+// ─── Rotas de Entidades Modulares ─────────────────────────────────────────────
+// Centraliza o uso dos roteadores específicos de cada entidade.
+router.use('/people', peopleRoutes);
+router.use('/teachers', teacherRoutes);
+router.use('/schedules', scheduleRoutes);
 
 // ─── Informações do servidor ─────────────────────────────────────────────────
 router.get('/app/dataPath', (req, res) => {
@@ -576,120 +587,9 @@ router.post('/admins/login', async (req, res) => {
 // PROFESSORES
 // ════════════════════════════════════════════════════════════════════════════
 
-router.get('/teachers', async (req, res) => {
-  try {
-    const schoolId = intParam(req.query.schoolId);
-    const q = getDb()('teachers').orderBy('name');
-    if (schoolId) q.where({ school_id: schoolId });
-    ok(res, await q);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/teachers', async (req, res) => {
-  try {
-    const { school_id, name, registration = '', email = '', subjects = '' } = req.body;
-    if (!intParam(school_id) || !isValidTeacherData({ name, email, registration }))
-      return fail(res, 'Dados inválidos.');
-
-    const sm = new SubscriptionManager(getDb());
-    const check = await sm.canCreateTeacher(school_id);
-    if (!check.allowed) return fail(res, check.reason, 403);
-
-    const [row] = await getDb()('teachers').insert({
-      school_id, name: name.trim(), registration: registration.trim(), email: email.trim(), subjects
-    }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.put('/teachers/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id || !isValidTeacherData(req.body)) return fail(res, 'Dados inválidos.');
-    const { name, registration = '', email = '', subjects = '' } = req.body;
-    await getDb()('teachers').where({ id }).update({
-      name: name.trim(), registration: registration.trim(), email: email.trim(), subjects
-    });
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.delete('/teachers/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('teachers').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.get('/teachers/:id/availability', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    const rows = await getDb()('teacher_availability').where({ teacher_id: id }).orderBy(['weekday', 'period']).select('weekday', 'period');
-    ok(res, rows);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.put('/teachers/:id/availability', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    const slots = req.body.slots;
-    if (!id || !Array.isArray(slots)) return fail(res, 'Dados inválidos.');
-
-    await getDb().transaction(async trx => {
-      await trx('teacher_availability').where({ teacher_id: id }).del();
-      const valid = slots.filter(s => intParam(s.weekday) && intParam(s.period));
-      if (valid.length > 0) {
-        await trx('teacher_availability').insert(valid.map(s => ({ teacher_id: id, weekday: s.weekday, period: s.period })));
-      }
-    });
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
 // ════════════════════════════════════════════════════════════════════════════
 // CRONOGRAMAS
 // ════════════════════════════════════════════════════════════════════════════
-
-router.get('/schedules', async (req, res) => {
-  try {
-    const schoolId = intParam(req.query.schoolId);
-    const q = getDb()('schedules').orderBy([{ column: 'year', order: 'desc' }, { column: 'semester', order: 'desc' }]);
-    if (schoolId) q.where({ school_id: schoolId });
-    ok(res, await q);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.post('/schedules', async (req, res) => {
-  try {
-    const { school_id, name, year, semester } = req.body;
-    if (!intParam(school_id) || !name?.trim() || !intParam(year) || !intParam(semester))
-      return fail(res, 'Dados inválidos.');
-    const [row] = await getDb()('schedules').insert({ school_id, name: name.trim(), year, semester }).returning('id');
-    ok(res, { id: row.id ?? row });
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.put('/schedules/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    const { name, year, semester, active } = req.body;
-    if (!id || !name?.trim() || !intParam(year) || !intParam(semester)) return fail(res, 'Dados inválidos.');
-    await getDb()('schedules').where({ id }).update({ name: name.trim(), year, semester, active: !!active });
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
-
-router.delete('/schedules/:id', async (req, res) => {
-  try {
-    const id = intParam(req.params.id);
-    if (!id) return fail(res, 'ID inválido.');
-    await getDb()('schedules').where({ id }).del();
-    ok(res);
-  } catch (e) { fail(res, e.message, 500); }
-});
 
 // ════════════════════════════════════════════════════════════════════════════
 // AULAS
@@ -1227,17 +1127,6 @@ router.post('/licenses/deactivate', async (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 // APP PROFESSOR - AULA.app
 // ════════════════════════════════════════════════════════════════════════════
-
-router.get('/teachers/:id/lessons', async (req, res) => {
-  try {
-    const teacherId = intParam(req.params.id);
-    if (!teacherId) return fail(res, 'Professor ID inválido.');
-
-    const { data: rows, error: rpcErr } = await getDb().rpc('app_get_teacher_schedule', { p_teacher_id: teacherId });
-    if (rpcErr) throw new Error(rpcErr.message);
-    ok(res, rows || []);
-  } catch (e) { fail(res, 'Erro ao carregar horários: ' + e.message, 500); }
-});
 
 router.get('/classes/:id/lessons', async (req, res) => {
   try {
@@ -2379,5 +2268,533 @@ router.put('/ponto/settings', async (req, res) => {
   } catch (e) { fail(res, e.message, 500); }
 });
 
-module.exports = router;
+// ════════════════════════════════════════════════════════════════════════════
+// FEATURE 8 — AUDITORIA DE AÇÕES (LGPD)
+// Tabela: audit_log (action, entity, entity_id, admin_id, school_id, details)
+// ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Registra uma entrada de auditoria. Chamado internamente; não expõe rota de
+ * escrita ao cliente para evitar manipulação de logs.
+ */
+async function audit(schoolId, adminId, action, entity, entityId, details = {}) {
+  try {
+    await getDb()('audit_log').insert({
+      school_id: schoolId,
+      admin_id:  adminId,
+      action,
+      entity,
+      entity_id:  entityId ? String(entityId) : null,
+      details:    JSON.stringify(details),
+      created_at: new Date().toISOString(),
+    });
+  } catch (_) {
+    // Falha silenciosa — não bloqueia a operação principal
+  }
+}
+
+// GET /audit?schoolId=X&limit=100&offset=0 — histórico de auditoria
+router.get('/audit', requireAuth, async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId) || req.adminSession?.school_id;
+    if (!schoolId) return fail(res, 'schoolId obrigatório.');
+    const limit  = Math.min(intParam(req.query.limit)  || 50, 200);
+    const offset = intParam(req.query.offset) || 0;
+    const rows = await getDb()('audit_log')
+      .where({ school_id: schoolId })
+      .orderBy('created_at', 'desc')
+      .limit(limit)
+      .select('id', 'admin_id', 'action', 'entity', 'entity_id', 'details', 'created_at');
+    // Enriquecer com nome do admin
+    const adminIds = [...new Set(rows.map(r => r.admin_id).filter(Boolean))];
+    const admins = adminIds.length
+      ? await getDb()('admins').whereIn('id', adminIds).select('id', 'name')
+      : [];
+    const adminMap = Object.fromEntries(admins.map(a => [a.id, a.name]));
+    ok(res, rows.map(r => ({
+      ...r,
+      admin_name: adminMap[r.admin_id] ?? '—',
+      details: (() => { try { return JSON.parse(r.details || '{}'); } catch { return {}; } })(),
+    })));
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// FEATURE 3 — MULTI-USUÁRIO COM ROLES (coordenador, diretor, secretário)
+// Adiciona campo role na tabela admins. Leitura/atualização via esta rota.
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /admins/:id/role — retorna role atual
+router.get('/admins/:id/role', requireAuth, async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    const admin = await getDb()('admins').where({ id }).select('id', 'name', 'role').first();
+    if (!admin) return fail(res, 'Admin não encontrado.', 404);
+    ok(res, admin);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// PUT /admins/:id/role — atualiza role (admin, coordenador, diretor, secretario)
+router.put('/admins/:id/role', requireAuth, async (req, res) => {
+  try {
+    const id   = intParam(req.params.id);
+    const { role } = req.body;
+    const ROLES = ['admin', 'coordenador', 'diretor', 'secretario'];
+    if (!id || !ROLES.includes(role)) return fail(res, `Role inválido. Opções: ${ROLES.join(', ')}.`);
+    await getDb()('admins').where({ id }).update({ role });
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'update_role', 'admin', id, { role });
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// GET /roles/permissions — retorna mapa de permissões por role
+router.get('/roles/permissions', (req, res) => {
+  ok(res, {
+    admin:       { modules: ['cronograma','aula','dados','usuarios','ponto','licencas','dashboard','calendario','substituicoes','notificacoes'], readonly: false },
+    diretor:     { modules: ['cronograma','aula','dados','usuarios','ponto','dashboard','calendario','substituicoes'], readonly: false },
+    coordenador: { modules: ['cronograma','aula','dados','usuarios','dashboard','calendario','substituicoes'], readonly: false },
+    secretario:  { modules: ['cronograma','aula','dados','dashboard'], readonly: true },
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// FEATURE 4 — PORTAL DO PROFESSOR (login restrito, leitura do próprio cronograma)
+// Professor faz login com credenciais próprias; vê seu horário e pontos.
+// ════════════════════════════════════════════════════════════════════════════
+
+// POST /teacher-portal/login
+router.post('/teacher-portal/login', authLimiter, async (req, res) => {
+  try {
+    const { schoolId, email, password } = req.body;
+    if (!intParam(schoolId) || !email?.trim() || !password?.trim())
+      return fail(res, 'Credenciais inválidas.');
+
+    const teacher = await getDb()('teachers')
+      .where({ school_id: schoolId, email: email.trim() })
+      .select('id', 'name', 'email', 'portal_password_hash', 'active').first();
+
+    if (!teacher)           return fail(res, 'E-mail ou senha incorretos.');
+    if (!teacher.active)    return fail(res, 'Acesso inativo.');
+    if (!teacher.portal_password_hash)
+      return fail(res, 'Conta de portal não ativada. Solicite ao coordenador.');
+
+    const valid = await verifyPassword(password, teacher.portal_password_hash);
+    if (!valid) return fail(res, 'E-mail ou senha incorretos.');
+
+    const token = generateToken();
+    await getDb()('teacher_portal_sessions').insert({
+      school_id:  schoolId,
+      teacher_id: teacher.id,
+      token,
+      created_at: new Date().toISOString(),
+    });
+
+    res.cookie('aula_teacher_session', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure:   process.env.NODE_ENV === 'production',
+      maxAge:   12 * 60 * 60 * 1000,
+    });
+
+    ok(res, { token, teacher: { id: teacher.id, name: teacher.name, email: teacher.email, schoolId } });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// POST /teacher-portal/set-password — admin define/redefine senha do portal
+router.post('/teacher-portal/set-password', requireAuth, async (req, res) => {
+  try {
+    const { teacherId, password } = req.body;
+    if (!intParam(teacherId) || !password || password.length < 6)
+      return fail(res, 'teacherId e senha (mín. 6 chars) são obrigatórios.');
+    const hashed = await hashPassword(password);
+    await getDb()('teachers').where({ id: teacherId }).update({ portal_password_hash: hashed });
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'set_portal_password', 'teacher', teacherId);
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// Middleware portal professor
+async function requireTeacherPortal(req, res, next) {
+  const token = req.cookies?.aula_teacher_session || req.headers['x-teacher-token'];
+  if (!token) return res.status(401).json({ success: false, error: 'Não autenticado.' });
+  const session = await getDb()('teacher_portal_sessions').where({ token }).first();
+  if (!session) return res.status(401).json({ success: false, error: 'Sessão inválida.' });
+  req.teacherSession = session;
+  next();
+}
+
+// GET /teacher-portal/me
+router.get('/teacher-portal/me', requireTeacherPortal, async (req, res) => {
+  try {
+    const teacher = await getDb()('teachers')
+      .where({ id: req.teacherSession.teacher_id })
+      .select('id', 'name', 'email', 'registration', 'subjects').first();
+    ok(res, teacher);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// GET /teacher-portal/schedule — cronograma próprio
+router.get('/teacher-portal/schedule', requireTeacherPortal, async (req, res) => {
+  try {
+    const { data, error } = await getDb().rpc('app_get_teacher_schedule', { p_teacher_id: req.teacherSession.teacher_id });
+    if (error) throw new Error(error.message);
+    ok(res, data || []);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// GET /teacher-portal/substitutions — substituições do professor
+router.get('/teacher-portal/substitutions', requireTeacherPortal, async (req, res) => {
+  try {
+    const rows = await getDb()('teacher_substitutions')
+      .where({ substitute_teacher_id: req.teacherSession.teacher_id })
+      .orderBy('date', 'desc')
+      .limit(30)
+      .select('id', 'original_teacher_id', 'date', 'weekday', 'period', 'class_id', 'subject', 'notes', 'status', 'created_at');
+    ok(res, rows);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// POST /teacher-portal/logout
+router.post('/teacher-portal/logout', async (req, res) => {
+  try {
+    const token = req.cookies?.aula_teacher_session;
+    if (token) await getDb()('teacher_portal_sessions').where({ token }).del();
+    res.clearCookie('aula_teacher_session');
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// FEATURE 2 — SUBSTITUIÇÃO DE PROFESSORES
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /substitutions?schoolId=X&date=YYYY-MM-DD
+router.get('/substitutions', requireAuth, async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId) || req.adminSession?.school_id;
+    if (!schoolId) return fail(res, 'schoolId obrigatório.');
+    const q = getDb()('teacher_substitutions').where({ school_id: schoolId }).orderBy('date', 'desc').limit(100);
+    if (req.query.date) q.where({ date: req.query.date });
+    const rows = await q.select('*');
+
+    // Enriquecer com nomes
+    const teacherIds = [...new Set([
+      ...rows.map(r => r.original_teacher_id),
+      ...rows.map(r => r.substitute_teacher_id),
+    ].filter(Boolean))];
+    const teachers = teacherIds.length ? await getDb()('teachers').whereIn('id', teacherIds).select('id', 'name') : [];
+    const tMap = Object.fromEntries(teachers.map(t => [t.id, t.name]));
+    const classIds = [...new Set(rows.map(r => r.class_id).filter(Boolean))];
+    const classes  = classIds.length ? await getDb()('classes').whereIn('id', classIds).select('id', 'name') : [];
+    const cMap = Object.fromEntries(classes.map(c => [c.id, c.name]));
+
+    ok(res, rows.map(r => ({
+      ...r,
+      original_teacher_name:  tMap[r.original_teacher_id]  ?? '—',
+      substitute_teacher_name: tMap[r.substitute_teacher_id] ?? 'A definir',
+      class_name: cMap[r.class_id] ?? '—',
+    })));
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// POST /substitutions — registra ausência/substituição
+router.post('/substitutions', requireAuth, async (req, res) => {
+  try {
+    const {
+      original_teacher_id, substitute_teacher_id = null,
+      date, weekday, period, class_id = null, subject = '', notes = '', school_id,
+    } = req.body;
+    if (!intParam(original_teacher_id) || !date || !intParam(weekday) || !intParam(period))
+      return fail(res, 'Dados obrigatórios: original_teacher_id, date, weekday, period.');
+
+    const sid = intParam(school_id) || req.adminSession?.school_id;
+    const [row] = await getDb()('teacher_substitutions').insert({
+      school_id: sid,
+      original_teacher_id,
+      substitute_teacher_id,
+      date,
+      weekday,
+      period,
+      class_id,
+      subject:  subject.trim(),
+      notes:    notes.trim(),
+      status:   substitute_teacher_id ? 'coberta' : 'pendente',
+      created_by: req.adminSession?.admin_id,
+      created_at: new Date().toISOString(),
+    }).returning('id');
+    const id = row.id ?? row;
+    await audit(sid, req.adminSession?.admin_id, 'create', 'substituicao', id, { original_teacher_id, date });
+    ok(res, { id });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// PUT /substitutions/:id — atualiza substituto / status
+router.put('/substitutions/:id', requireAuth, async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    const { substitute_teacher_id, status, notes } = req.body;
+    const fields = {};
+    if (substitute_teacher_id !== undefined) {
+      fields.substitute_teacher_id = intParam(substitute_teacher_id) || null;
+      fields.status = fields.substitute_teacher_id ? 'coberta' : 'pendente';
+    }
+    if (status)  fields.status = status;
+    if (notes !== undefined) fields.notes = notes;
+    await getDb()('teacher_substitutions').where({ id }).update(fields);
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'update', 'substituicao', id, fields);
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// DELETE /substitutions/:id
+router.delete('/substitutions/:id', requireAuth, async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    await getDb()('teacher_substitutions').where({ id }).del();
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'delete', 'substituicao', id);
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// FEATURE 6 — CALENDÁRIO ACADÊMICO (datas letivas, feriados, eventos)
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /calendar?schoolId=X&year=YYYY
+router.get('/calendar', requireAuth, async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId) || req.adminSession?.school_id;
+    if (!schoolId) return fail(res, 'schoolId obrigatório.');
+    const q = getDb()('academic_calendar').where({ school_id: schoolId }).orderBy('date');
+    if (req.query.year) q.where('date', '>=', `${req.query.year}-01-01`).where('date', '<=', `${req.query.year}-12-31`);
+    ok(res, await q.select('*'));
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// POST /calendar — cria evento
+router.post('/calendar', requireAuth, async (req, res) => {
+  try {
+    const { date, end_date = null, type, title, description = '', affects_classes = true, school_id } = req.body;
+    const TYPES = ['feriado', 'recesso', 'evento', 'reposicao', 'reuniao', 'outro'];
+    if (!date || !TYPES.includes(type) || !title?.trim()) return fail(res, 'Dados inválidos. Campos: date, type, title.');
+    const sid = intParam(school_id) || req.adminSession?.school_id;
+    const [row] = await getDb()('academic_calendar').insert({
+      school_id: sid, date, end_date, type,
+      title: title.trim(), description: description.trim(),
+      affects_classes: !!affects_classes,
+      created_by: req.adminSession?.admin_id,
+      created_at: new Date().toISOString(),
+    }).returning('id');
+    const id = row.id ?? row;
+    await audit(sid, req.adminSession?.admin_id, 'create', 'calendario', id, { date, type, title });
+    ok(res, { id });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// PUT /calendar/:id
+router.put('/calendar/:id', requireAuth, async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    const { date, end_date = null, type, title, description = '', affects_classes = true } = req.body;
+    const TYPES = ['feriado', 'recesso', 'evento', 'reposicao', 'reuniao', 'outro'];
+    if (!date || !TYPES.includes(type) || !title?.trim()) return fail(res, 'Dados inválidos.');
+    await getDb()('academic_calendar').where({ id }).update({
+      date, end_date, type, title: title.trim(), description: description.trim(), affects_classes: !!affects_classes,
+    });
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'update', 'calendario', id, { date, type });
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// DELETE /calendar/:id
+router.delete('/calendar/:id', requireAuth, async (req, res) => {
+  try {
+    const id = intParam(req.params.id);
+    if (!id) return fail(res, 'ID inválido.');
+    await getDb()('academic_calendar').where({ id }).del();
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'delete', 'calendario', id);
+    ok(res);
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// FEATURE 1 — DASHBOARD ANALÍTICO
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /dashboard?schoolId=X — métricas consolidadas
+router.get('/dashboard', requireAuth, async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId) || req.adminSession?.school_id;
+    if (!schoolId) return fail(res, 'schoolId obrigatório.');
+    const db = getDb();
+
+    const [
+      [{ cnt: totalTeachers }],
+      [{ cnt: activeTeachers }],
+      [{ cnt: totalClasses }],
+      [{ cnt: totalSchedules }],
+      schedules,
+      recentSubs,
+      upcomingEvents,
+      recentAudit,
+    ] = await Promise.all([
+      db('teachers').where({ school_id: schoolId }).count('id as cnt'),
+      db('teachers').where({ school_id: schoolId, active: true }).count('id as cnt'),
+      db('classes').where({ school_id: schoolId }).count('id as cnt'),
+      db('schedules').where({ school_id: schoolId }).count('id as cnt'),
+      db('schedules').where({ school_id: schoolId, active: true }).orderBy('created_at', 'desc').limit(5).select('id', 'name', 'year', 'semester'),
+      db('teacher_substitutions').where({ school_id: schoolId, status: 'pendente' }).orderBy('date', 'asc').limit(5).select('id', 'date', 'subject', 'status'),
+      db('academic_calendar').where({ school_id: schoolId }).where('date', '>=', new Date().toISOString().slice(0, 10)).orderBy('date', 'asc').limit(5).select('id', 'date', 'type', 'title'),
+      db('audit_log').where({ school_id: schoolId }).orderBy('created_at', 'desc').limit(10).select('action', 'entity', 'admin_id', 'created_at'),
+    ]);
+
+    // Carga por professor: conta aulas por professor no cronograma ativo
+    let teacherLoad = [];
+    if (schedules.length) {
+      const activeScheduleId = schedules[0]?.id;
+      const lessons = await db('lessons').where({ schedule_id: activeScheduleId }).select('teacher_id');
+      const loadMap = {};
+      lessons.forEach(l => { if (l.teacher_id) loadMap[l.teacher_id] = (loadMap[l.teacher_id] || 0) + 1; });
+      const teacherIds = Object.keys(loadMap).map(Number);
+      const teachers   = teacherIds.length ? await db('teachers').whereIn('id', teacherIds).select('id', 'name') : [];
+      teacherLoad = teachers.map(t => ({ id: t.id, name: t.name, lessons: loadMap[t.id] || 0 }))
+        .sort((a, b) => b.lessons - a.lessons).slice(0, 10);
+    }
+
+    ok(res, {
+      summary: {
+        totalTeachers: parseInt(totalTeachers),
+        activeTeachers: parseInt(activeTeachers),
+        totalClasses: parseInt(totalClasses),
+        totalSchedules: parseInt(totalSchedules),
+      },
+      activeSchedules: schedules,
+      teacherLoad,
+      pendingSubstitutions: recentSubs,
+      upcomingEvents,
+      recentActivity: recentAudit,
+    });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// FEATURE 9 — RELATÓRIOS PDF (geração no servidor via Supabase Edge Function)
+// O servidor invoca a Edge Function do Supabase, que retorna PDF em base64.
+// Enquanto a Edge Function não está publicada, retorna dados JSON para o
+// cliente gerar localmente com a lib de PDF do browser.
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /reports/schedule/:scheduleId — dados para PDF do cronograma
+router.get('/reports/schedule/:scheduleId', requireAuth, async (req, res) => {
+  try {
+    const scheduleId = intParam(req.params.scheduleId);
+    if (!scheduleId) return fail(res, 'ID inválido.');
+    const schedule = await getDb()('schedules').where({ id: scheduleId }).first();
+    if (!schedule) return fail(res, 'Cronograma não encontrado.', 404);
+
+    const [lessons, classes, teachers, timeSlots] = await Promise.all([
+      getDb()('lessons').where({ schedule_id: scheduleId }).orderBy(['weekday', 'period']).select('*'),
+      getDb()('classes').where({ school_id: schedule.school_id }).orderBy('name').select('id', 'name', 'shift_id'),
+      getDb()('teachers').where({ school_id: schedule.school_id }).orderBy('name').select('id', 'name'),
+      getDb()('time_slots').orderBy('period').select('*'),
+    ]);
+
+    const school = await getDb()('schools').where({ id: schedule.school_id }).first();
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'export_pdf', 'schedule', scheduleId);
+
+    ok(res, { schedule, school, lessons, classes, teachers, timeSlots });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// GET /reports/ponto-monthly?schoolId=X&year=YYYY&month=MM — relatório mensal de ponto
+router.get('/reports/ponto-monthly', requireAuth, async (req, res) => {
+  try {
+    const schoolId = intParam(req.query.schoolId) || req.adminSession?.school_id;
+    const year  = req.query.year  || new Date().getFullYear();
+    const month = req.query.month || String(new Date().getMonth() + 1).padStart(2, '0');
+    if (!schoolId) return fail(res, 'schoolId obrigatório.');
+
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate   = new Date(year, month, 0).toISOString().slice(0, 10);
+
+    const [employees, records] = await Promise.all([
+      getDb()('ponto_employees').where({ school_id: schoolId, active: true }).orderBy('name').select('id', 'name', 'registration'),
+      getDb()('ponto_records').where({ school_id: schoolId }).where('punched_at', '>=', startDate).where('punched_at', '<=', endDate + 'T23:59:59Z').orderBy(['employee_id', 'punched_at']).select('*'),
+    ]);
+
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'export_pdf', 'ponto_mensal', null, { year, month });
+    ok(res, { employees, records, period: { year, month, startDate, endDate } });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// GET /reports/teacher-load/:scheduleId — carga horária por professor
+router.get('/reports/teacher-load/:scheduleId', requireAuth, async (req, res) => {
+  try {
+    const scheduleId = intParam(req.params.scheduleId);
+    if (!scheduleId) return fail(res, 'ID inválido.');
+    const schedule = await getDb()('schedules').where({ id: scheduleId }).first();
+    if (!schedule) return fail(res, 'Cronograma não encontrado.', 404);
+
+    const [lessons, teachers, curricula] = await Promise.all([
+      getDb()('lessons').where({ schedule_id: scheduleId }).select('teacher_id', 'subject', 'weekday', 'period'),
+      getDb()('teachers').where({ school_id: schedule.school_id }).select('id', 'name', 'email'),
+      getDb()('curricula').where({ school_id: schedule.school_id }).select('id', 'name'),
+    ]);
+
+    const tMap = Object.fromEntries(teachers.map(t => [t.id, t]));
+    const load = {};
+    lessons.forEach(l => {
+      const tid = l.teacher_id;
+      if (!tid) return;
+      if (!load[tid]) load[tid] = { ...tMap[tid], totalLessons: 0, subjects: {} };
+      load[tid].totalLessons++;
+      load[tid].subjects[l.subject] = (load[tid].subjects[l.subject] || 0) + 1;
+    });
+
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'export_pdf', 'teacher_load', scheduleId);
+    ok(res, { schedule, teachers: Object.values(load).sort((a, b) => b.totalLessons - a.totalLessons) });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// FEATURE 10 — NOTIFICAÇÕES PUSH (gestão pelo coordenador)
+// ════════════════════════════════════════════════════════════════════════════
+
+// POST /notifications/broadcast — envia notificação a todos professores com push ativo
+router.post('/notifications/broadcast', requireAuth, async (req, res) => {
+  try {
+    const { title, body, schoolId } = req.body;
+    if (!title?.trim() || !body?.trim()) return fail(res, 'title e body são obrigatórios.');
+    const sid = intParam(schoolId) || req.adminSession?.school_id;
+
+    const teachers = await getDb()('teachers').where({ school_id: sid, active: true }).select('id');
+    let sent = 0;
+    for (const t of teachers) {
+      try {
+        await pushManager.sendNotification(t.id, title.trim(), body.trim());
+        sent++;
+      } catch (_) {}
+    }
+    await audit(sid, req.adminSession?.admin_id, 'broadcast_notification', 'teachers', null, { title, sent });
+    ok(res, { sent });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+// POST /notifications/teacher/:id — envia notificação a professor específico
+router.post('/notifications/teacher/:id', requireAuth, async (req, res) => {
+  try {
+    const teacherId = intParam(req.params.id);
+    const { title, body } = req.body;
+    if (!teacherId || !title?.trim() || !body?.trim())
+      return fail(res, 'teacherId, title e body são obrigatórios.');
+    await pushManager.sendNotification(teacherId, title.trim(), body.trim());
+    await audit(req.adminSession?.school_id, req.adminSession?.admin_id, 'send_notification', 'teacher', teacherId, { title });
+    ok(res, { sent: true });
+  } catch (e) { fail(res, e.message, 500); }
+});
+
+module.exports = router;

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal do Professor · Scholar</title>
+  <link rel="stylesheet" href="/src/renderer/styles/app.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; min-height: 100vh; }
+
+    /* ── Login ── */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    }
+    .login-card {
+      background: #fff; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,.12);
+      padding: 40px; width: 100%; max-width: 360px;
+    }
+    .login-card h1 { margin: 0 0 4px; font-size: 22px; }
+    .login-card .subtitle { margin: 0 0 28px; color: #64748b; font-size: 14px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #374151; }
+    .form-group input { width: 100%; padding: 10px 12px; border: 1.5px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; transition: border-color .15s; }
+    .form-group input:focus { border-color: #2563eb; }
+    .btn-login { width: 100%; padding: 11px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .15s; }
+    .btn-login:hover { background: #1d4ed8; }
+    .error-msg { color: #dc2626; font-size: 13px; margin-top: 10px; display: none; }
+
+    /* ── Portal principal ── */
+    #portal-screen { display: none; }
+    .portal-header {
+      background: #fff; border-bottom: 1px solid #e2e8f0; padding: 12px 24px;
+      display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10;
+    }
+    .portal-header h2 { margin: 0; font-size: 18px; }
+    .portal-header .teacher-name { font-weight: 700; color: #2563eb; }
+    .btn-logout { padding: 7px 16px; background: transparent; border: 1.5px solid #e2e8f0; border-radius: 6px; cursor: pointer; font-size: 13px; color: #64748b; }
+    .btn-logout:hover { background: #f8fafc; border-color: #cbd5e1; }
+
+    .portal-nav { display: flex; gap: 4px; padding: 16px 24px 0; border-bottom: 1px solid #e2e8f0; background: #fff; }
+    .portal-nav-btn { padding: 9px 18px; border: none; background: transparent; border-bottom: 3px solid transparent; cursor: pointer; font-size: 14px; font-weight: 500; color: #64748b; transition: all .15s; border-radius: 0; }
+    .portal-nav-btn.active { color: #2563eb; border-bottom-color: #2563eb; font-weight: 600; }
+
+    .portal-content { padding: 24px; max-width: 900px; margin: 0 auto; }
+
+    /* ── Seções ── */
+    .section { display: none; }
+    .section.active { display: block; }
+    .section-title { font-size: 18px; font-weight: 700; margin: 0 0 16px; }
+
+    /* Cartões */
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 16px; overflow: hidden; }
+    .card-header { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; font-weight: 600; font-size: 14px; background: #f8fafc; }
+    .card-body { padding: 18px; }
+
+    /* Grade horária */
+    .schedule-grid { display: grid; grid-template-columns: 80px repeat(5, 1fr); gap: 2px; }
+    .sg-header { background: #1e293b; color: #fff; padding: 8px; text-align: center; font-size: 12px; font-weight: 600; border-radius: 4px; }
+    .sg-time { background: #f1f5f9; padding: 8px; text-align: center; font-size: 11px; font-weight: 600; color: #64748b; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+    .sg-cell { background: #f8fafc; padding: 8px; border-radius: 4px; font-size: 11px; min-height: 52px; }
+    .sg-cell.has-lesson { background: #dbeafe; border-left: 3px solid #2563eb; }
+    .sg-cell .lesson-subject { font-weight: 700; color: #1e40af; margin-bottom: 2px; }
+    .sg-cell .lesson-class { color: #3b82f6; }
+
+    /* Substituições */
+    .sub-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .sub-badge.pendente { background: #fef3c7; color: #d97706; }
+    .sub-badge.confirmada { background: #d1fae5; color: #059669; }
+    .sub-badge.cancelada { background: #f3f4f6; color: #6b7280; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .05em; border-bottom: 2px solid #e5e7eb; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+
+    .loading { text-align: center; padding: 40px; color: #94a3b8; font-size: 14px; }
+    .loading-dots::after { content: '...'; animation: dots 1.2s infinite; }
+    @keyframes dots { 0%,100%{content:'.'} 33%{content:'..'} 66%{content:'...'} }
+
+    .empty-state { text-align: center; padding: 48px 20px; color: #94a3b8; }
+    .empty-state .icon { font-size: 40px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+  <!-- Tela de login -->
+  <div id="login-screen">
+    <div class="login-card">
+      <h1>👨‍🏫 Portal do Professor</h1>
+      <p class="subtitle">Acesse com o e-mail e senha fornecidos pela coordenação.</p>
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="login-email" autocomplete="username" placeholder="seu@email.com">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="login-password" autocomplete="current-password" placeholder="S enha de acesso">
+      </div>
+      <button class="btn-login" id="btn-portal-login">Entrar</button>
+      <p class="error-msg" id="login-error"></p>
+    </div>
+  </div>
+
+  <!-- Portal principal (aparece depois do login) -->
+  <div id="portal-screen">
+    <header class="portal-header">
+      <div>
+        <h2>Portal do Professor · <span class="teacher-name" id="portal-teacher-name">—</span></h2>
+      </div>
+      <button class="btn-logout" id="btn-portal-logout">🚪 Sair</button>
+    </header>
+
+    <nav class="portal-nav">
+      <button class="portal-nav-btn active" data-section="horario">📅 Meu Horário</button>
+      <button class="portal-nav-btn" data-section="substituicoes">🔄 Substituições</button>
+    </nav>
+
+    <div class="portal-content">
+
+      <!-- Seção: grade horária -->
+      <section id="section-horario" class="section active">
+        <h3 class="section-title">📅 Meu Horário de Aulas</h3>
+        <div id="horario-content" class="loading"><span class="loading-dots">Carregando</span></div>
+      </section>
+
+      <!-- Seção: substituições -->
+      <section id="section-substituicoes" class="section">
+        <h3 class="section-title">🔄 Substituições</h3>
+        <div id="subs-content" class="loading"><span class="loading-dots">Carregando</span></div>
+      </section>
+
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = `${window.location.origin}/api`;
+
+    async function api(method, endpoint, body = null) {
+      const opts = { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include' };
+      if (body !== null) opts.body = JSON.stringify(body);
+      const res = await fetch(`${API_BASE}${endpoint}`, opts);
+      return res.json();
+    }
+
+    const get  = ep       => api('GET', ep);
+    const post = (ep, b)  => api('POST', ep, b);
+
+    // ── Login ──────────────────────────────────────────────────────────────────
+    document.getElementById('btn-portal-login').addEventListener('click', doLogin);
+    document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+    async function doLogin() {
+      const email    = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errorEl  = document.getElementById('login-error');
+      errorEl.style.display = 'none';
+
+      if (!email || !password) { showError('Preencha e-mail e senha.'); return; }
+
+      const btn = document.getElementById('btn-portal-login');
+      btn.disabled = true;
+      btn.textContent = 'Entrando…';
+
+      try {
+        const r = await post('/teacher-portal/login', { email, password });
+        if (r.success) {
+          showPortal(r.data);
+        } else {
+          showError(r.error || 'E-mail ou senha inválidos.');
+        }
+      } catch (e) {
+        showError('Falha na conexão. Tente novamente.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('login-error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    // ── Portal ─────────────────────────────────────────────────────────────────
+    async function showPortal(data) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('portal-screen').style.display = 'block';
+      document.getElementById('portal-teacher-name').textContent = data?.teacher?.name ?? '—';
+      await Promise.all([loadHorario(), loadSubstituicoes()]);
+    }
+
+    // Verificar sessão existente ao abrir
+    (async () => {
+      try {
+        const r = await get('/teacher-portal/me');
+        if (r.success && r.data) {
+          await showPortal(r.data);
+        }
+      } catch (_) { /* sem sessão ativa */ }
+    })();
+
+    // Logout
+    document.getElementById('btn-portal-logout').addEventListener('click', async () => {
+      await post('/teacher-portal/logout', {});
+      document.getElementById('portal-screen').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('login-password').value = '';
+    });
+
+    // ── Navegação ──────────────────────────────────────────────────────────────
+    document.querySelectorAll('.portal-nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.portal-nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`section-${btn.dataset.section}`).classList.add('active');
+      });
+    });
+
+    // ── Horário ────────────────────────────────────────────────────────────────
+    const DAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+
+    async function loadHorario() {
+      const el = document.getElementById('horario-content');
+      el.innerHTML = '<div class="loading"><span class="loading-dots">Carregando</span></div>';
+      try {
+        const r = await get('/teacher-portal/schedule');
+        if (!r.success || !r.data?.lessons?.length) {
+          el.innerHTML = '<div class="empty-state"><div class="icon">📅</div><p>Sem aulas cadastradas no cronograma ativo.</p></div>';
+          return;
+        }
+
+        const { lessons, timeSlots } = r.data;
+
+        // Agrupar por schedule
+        const bySchedule = {};
+        lessons.forEach(l => {
+          const skey = l.schedule_name || 'Cronograma';
+          if (!bySchedule[skey]) bySchedule[skey] = [];
+          bySchedule[skey].push(l);
+        });
+
+        let html = '';
+        for (const [scheduleName, sLessons] of Object.entries(bySchedule)) {
+          // Montar grid: linhas = time_slot, colunas = dia semana 1-5
+          const slots = timeSlots || [];
+          const grid = {};
+          sLessons.forEach(l => {
+            const key = `${l.time_slot_id}-${l.weekday}`;
+            grid[key] = l;
+          });
+
+          html += `<div class="card" style="margin-bottom:20px">
+            <div class="card-header">📅 ${esc(scheduleName)}</div>
+            <div class="card-body" style="overflow-x:auto">
+              <div class="schedule-grid">
+                <div class="sg-header">Horário</div>
+                ${DAYS.map(d => `<div class="sg-header">${d}</div>`).join('')}
+                ${slots.map(slot => `
+                  <div class="sg-time">${esc(slot.name || slot.start_time || '')}</div>
+                  ${[1,2,3,4,5].map(wd => {
+                    const l = grid[`${slot.id}-${wd}`];
+                    return l
+                      ? `<div class="sg-cell has-lesson"><div class="lesson-subject">${esc(l.subject_name||l.curricula_name||'')}</div><div class="lesson-class">${esc(l.class_name||'')}</div></div>`
+                      : `<div class="sg-cell"></div>`;
+                  }).join('')}
+                `).join('')}
+              </div>
+            </div>
+          </div>`;
+        }
+        el.innerHTML = html || '<div class="empty-state"><div class="icon">📅</div><p>Sem cronograma ativo.</p></div>';
+      } catch (e) {
+        el.innerHTML = `<p style="color:#dc2626">Erro ao carregar horário.</p>`;
+      }
+    }
+
+    // ── Substituições ──────────────────────────────────────────────────────────
+    async function loadSubstituicoes() {
+      const el = document.getElementById('subs-content');
+      el.innerHTML = '<div class="loading"><span class="loading-dots">Carregando</span></div>';
+      try {
+        const r = await get('/teacher-portal/substitutions');
+        if (!r.success || !r.data?.length) {
+          el.innerHTML = '<div class="empty-state"><div class="icon">🔄</div><p>Nenhuma substituição encontrada.</p></div>';
+          return;
+        }
+        const rows = r.data;
+        el.innerHTML = `
+          <div class="card">
+            <div class="card-body" style="overflow-x:auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Aula / Turma</th>
+                    <th>Componente</th>
+                    <th>Status</th>
+                    <th>Observação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map(r => {
+                    const isOriginal = r._role === 'original';
+                    return `
+                      <tr>
+                        <td>${r.date ? new Date(r.date + 'T00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                        <td style="font-size:12px;color:#64748b">${isOriginal ? '📤 Ausente' : '📥 Substituto'}</td>
+                        <td>${esc(r.class_name||'')} ${r.period ? `• ${r.period}º aula` : ''}</td>
+                        <td>${esc(r.subject||'')}</td>
+                        <td><span class="sub-badge ${r.status||'pendente'}">${r.status||'pendente'}</span></td>
+                        <td style="color:#64748b;font-size:12px">${esc(r.notes||'')}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        el.innerHTML = `<p style="color:#dc2626">Erro ao carregar substituições.</p>`;
+      }
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+</body>
+</html>

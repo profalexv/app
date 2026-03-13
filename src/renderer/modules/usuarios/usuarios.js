@@ -11,11 +11,7 @@ window.UserManagementModule = (() => {
   let _editFuncId     = null;
   let _rolesPersonId  = null;
   let _cachedFunctions = []; // cache das staff_functions para o modal de papéis
-
-  // ── Utilidades ──────────────────────────────────────────────────────────────
-
-  function showModal(id)  { document.getElementById(id).classList.remove('hidden'); }
-  function hideModal(id)  { document.getElementById(id).classList.add('hidden'); }
+  const E = s => window._esc(s); // Helper para escapar HTML, usando a função global
 
   function setError(formId, msg) {
     const el = document.querySelector(`#${formId} .form-error`);
@@ -39,8 +35,8 @@ window.UserManagementModule = (() => {
     if (person.is_teacher) parts.push('<span class="badge badge-teacher">Professor</span>');
     if (person.is_admin)   parts.push('<span class="badge badge-admin">Admin</span>');
     if (person.staff_functions) {
-      person.staff_functions.split(', ').forEach(fn =>
-        parts.push(`<span class="badge badge-staff">${fn}</span>`)
+      person.staff_functions.split(', ').forEach(fnName =>
+        parts.push(`<span class="badge badge-staff">${E(fnName)}</span>`)
       );
     }
     if (parts.length === 0) parts.push('<span class="badge badge-inactive">Sem papel ativo</span>');
@@ -81,124 +77,6 @@ window.UserManagementModule = (() => {
           </div>
           <div id="people-list" class="users-list loading">
             <div class="loading-spinner">Carregando...</div>
-          </div>
-        </div>
-
-        <!-- ── Modal: Criar/Editar Função ── -->
-        <div id="modal-func" class="u-modal hidden">
-          <div class="u-modal-bg"></div>
-          <div class="u-modal-content">
-            <div class="u-modal-header">
-              <h2 id="modal-func-title">Nova Função</h2>
-              <button class="u-modal-close">&times;</button>
-            </div>
-            <form id="form-func" class="form">
-              <div class="form-group">
-                <label>Nome da função *</label>
-                <input type="text" name="name" required placeholder="Ex: Segurança, Cozinheiro(a)...">
-              </div>
-              <div class="form-group">
-                <label>Categoria *</label>
-                <select name="category" required>
-                  <option value="pedagogico">Pedagógico</option>
-                  <option value="administrativo" selected>Administrativo</option>
-                  <option value="operacional">Operacional</option>
-                  <option value="outro">Outro</option>
-                </select>
-              </div>
-              <div class="u-modal-actions">
-                <button type="button" class="btn btn-secondary" id="btn-cancel-func">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Salvar</button>
-              </div>
-              <div class="form-error"></div>
-            </form>
-          </div>
-        </div>
-
-        <!-- ── Modal: Criar/Editar Pessoa ── -->
-        <div id="modal-person" class="u-modal hidden">
-          <div class="u-modal-bg"></div>
-          <div class="u-modal-content">
-            <div class="u-modal-header">
-              <h2 id="modal-person-title">Nova Pessoa</h2>
-              <button class="u-modal-close">&times;</button>
-            </div>
-            <form id="form-person" class="form">
-              <div class="form-group">
-                <label>Nome Completo *</label>
-                <input type="text" name="name" required placeholder="Nome completo">
-              </div>
-              <div class="form-group">
-                <label>Matrícula (opcional)</label>
-                <input type="text" name="registration" placeholder="Número de matrícula">
-              </div>
-              <div class="form-group">
-                <label>E-mail (opcional)</label>
-                <input type="email" name="email" placeholder="email@escola.edu">
-              </div>
-              <div class="form-group">
-                <label>Telefone (opcional)</label>
-                <input type="tel" name="phone" placeholder="(xx) 9xxxx-xxxx">
-              </div>
-              <div class="u-modal-actions">
-                <button type="button" class="btn btn-secondary" id="btn-cancel-person">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Salvar</button>
-              </div>
-              <div class="form-error"></div>
-            </form>
-          </div>
-        </div>
-
-        <!-- ── Modal: Gerenciar Papéis ── -->
-        <div id="modal-roles" class="u-modal hidden">
-          <div class="u-modal-bg"></div>
-          <div class="u-modal-content u-modal-wide">
-            <div class="u-modal-header">
-              <h2>Papéis de <span id="roles-person-name"></span></h2>
-              <button class="u-modal-close">&times;</button>
-            </div>
-
-            <div id="roles-content" class="roles-content">
-              <div class="loading-spinner">Carregando...</div>
-            </div>
-
-            <!-- Adicionar função de colaborador -->
-            <hr class="roles-divider">
-            <div class="form-group">
-              <label class="roles-label">Adicionar função de colaborador</label>
-              <div class="row-inline">
-                <select id="new-staff-func-select">
-                  <option value="">Selecione uma função...</option>
-                </select>
-                <button class="btn btn-primary btn-small" id="btn-add-staff-role">Adicionar</button>
-              </div>
-              <p class="hint" id="no-functions-hint" style="display:none">
-                Nenhuma função cadastrada.
-                <a href="#" id="link-go-functions">Cadastre funções primeiro.</a>
-              </p>
-            </div>
-
-            <!-- Adicionar papel de admin (só aparece se não tiver) -->
-            <div id="admin-role-section" style="display:none">
-              <hr class="roles-divider">
-              <p class="roles-label">Papel de Administrador do Sistema</p>
-              <form id="form-add-admin" class="form">
-                <div class="form-group">
-                  <label>Nome de usuário</label>
-                  <input type="text" id="admin-username" placeholder="username" autocomplete="new-password">
-                </div>
-                <div class="form-group">
-                  <label>Senha</label>
-                  <input type="password" id="admin-password" placeholder="Senha" autocomplete="new-password">
-                </div>
-                <button type="submit" class="btn btn-primary btn-small">Atribuir papel de Admin</button>
-                <div class="form-error"></div>
-              </form>
-            </div>
-
-            <div class="u-modal-actions">
-              <button type="button" class="btn btn-secondary" id="btn-close-roles">Fechar</button>
-            </div>
           </div>
         </div>
       </div>
@@ -263,29 +141,61 @@ window.UserManagementModule = (() => {
     }
   }
 
-  async function handleFuncSubmit(e) {
-    e.preventDefault();
-    setError('form-func', '');
-    const form = e.target;
-    const data = {
-      school_id: _schoolId,
-      name: form.name.value.trim(),
-      category: form.category.value,
-    };
-    try {
-      let res;
-      if (_editFuncId) {
-        res = await window.aula.updateStaffFunction(_editFuncId, data);
-      } else {
-        res = await window.aula.createStaffFunction(data);
+  function openFuncModal(func = null) {
+    const isEditing = func != null;
+    const title = isEditing ? 'Editar Função' : 'Nova Função';
+
+    const bodyHtml = `
+      <form id="form-func-dynamic" class="form">
+        <div class="form-group">
+          <label>Nome da função *</label>
+          <input type="text" name="name" required placeholder="Ex: Segurança, Cozinheiro(a)..." value="${isEditing ? E(func.name) : ''}">
+        </div>
+        <div class="form-group">
+          <label>Categoria *</label>
+          <select name="category" required>
+            <option value="pedagogico" ${isEditing && func.category === 'pedagogico' ? 'selected' : ''}>Pedagógico</option>
+            <option value="administrativo" ${!isEditing || func.category === 'administrativo' ? 'selected' : ''}>Administrativo</option>
+            <option value="operacional" ${isEditing && func.category === 'operacional' ? 'selected' : ''}>Operacional</option>
+            <option value="outro" ${isEditing && func.category === 'outro' ? 'selected' : ''}>Outro</option>
+          </select>
+        </div>
+        <div class="form-error"></div>
+      </form>
+    `;
+
+    window.openModal({
+      title: title,
+      bodyHtml: bodyHtml,
+      confirmLabel: 'Salvar',
+      onConfirm: async (overlay, close) => {
+        const form = overlay.querySelector('#form-func-dynamic');
+        const errorEl = form.querySelector('.form-error');
+        errorEl.textContent = '';
+
+        const data = {
+          school_id: _schoolId,
+          name: form.name.value.trim(),
+          category: form.category.value,
+        };
+
+        if (!data.name) {
+          errorEl.textContent = 'O nome da função é obrigatório.';
+          return; // Não fecha o modal
+        }
+
+        try {
+          const res = isEditing
+            ? await window.aula.updateStaffFunction(func.id, data)
+            : await window.aula.createStaffFunction(data);
+          if (!res.success) throw new Error(res.error);
+          close();
+          loadFunctions();
+        } catch (e) {
+          errorEl.textContent = e.message;
+        }
       }
-      if (!res.success) throw new Error(res.error);
-      hideModal('modal-func');
-      form.reset();
-      loadFunctions();
-    } catch (e) {
-      setError('form-func', e.message);
-    }
+    });
   }
 
   function handleFunctionListClick(e) {
@@ -294,12 +204,7 @@ window.UserManagementModule = (() => {
     const { action, id, name, category, active } = btn.dataset;
     const numId = parseInt(id);
     if (action === 'edit-func') {
-      _editFuncId = numId;
-      document.getElementById('modal-func-title').textContent = 'Editar Função';
-      const form = document.getElementById('form-func');
-      form.name.value = name;
-      form.category.value = category;
-      showModal('modal-func');
+      openFuncModal({ id: numId, name, category });
     } else if (action === 'toggle-func') {
       window.aula.toggleStaffFunction(numId, parseInt(active) === 1)
         .then(r => { if (r.success) loadFunctions(); });
@@ -327,11 +232,11 @@ window.UserManagementModule = (() => {
       list.innerHTML = data.data.map(p => `
         <div class="user-card">
           <div class="user-info">
-            <h3>${p.name}</h3>
+            <h3>${E(p.name)}</h3>
             <div class="role-badges">${roleBadges(p)}</div>
-            ${p.registration ? `<p class="meta">Matrícula: ${p.registration}</p>` : ''}
-            ${p.email ? `<p class="meta">📧 ${p.email}</p>` : ''}
-            ${p.phone ? `<p class="meta">📞 ${p.phone}</p>` : ''}
+            ${p.registration ? `<p class="meta">Matrícula: ${E(p.registration)}</p>` : ''}
+            ${p.email ? `<p class="meta">📧 ${E(p.email)}</p>` : ''}
+            ${p.phone ? `<p class="meta">📞 ${E(p.phone)}</p>` : ''}
           </div>
           <div class="user-actions">
             <button class="btn btn-small btn-info" data-action="edit-person"
@@ -351,28 +256,66 @@ window.UserManagementModule = (() => {
     }
   }
 
-  async function handlePersonSubmit(e) {
-    e.preventDefault();
-    setError('form-person', '');
-    const form = e.target;
-    const data = {
-      school_id: _schoolId,
-      name: form.name.value.trim(),
-      registration: form.registration.value.trim() || null,
-      email: form.email.value.trim() || null,
-      phone: form.phone.value.trim() || null,
-    };
-    try {
-      const res = _editPersonId
-        ? await window.aula.updatePerson(_editPersonId, data)
-        : await window.aula.createPerson(data);
-      if (!res.success) throw new Error(res.error);
-      hideModal('modal-person');
-      form.reset();
-      loadPeople();
-    } catch (e) {
-      setError('form-person', e.message);
-    }
+  function openPersonModal(person = null) {
+    const isEditing = person != null;
+    const title = isEditing ? 'Editar Pessoa' : 'Nova Pessoa';
+
+    const bodyHtml = `
+      <form id="form-person-dynamic" class="form">
+        <div class="form-group">
+          <label>Nome Completo *</label>
+          <input type="text" name="name" required placeholder="Nome completo" value="${isEditing ? E(person.name) : ''}">
+        </div>
+        <div class="form-group">
+          <label>Matrícula (opcional)</label>
+          <input type="text" name="registration" placeholder="Número de matrícula" value="${isEditing && person.registration ? E(person.registration) : ''}">
+        </div>
+        <div class="form-group">
+          <label>E-mail (opcional)</label>
+          <input type="email" name="email" placeholder="email@escola.edu" value="${isEditing && person.email ? E(person.email) : ''}">
+        </div>
+        <div class="form-group">
+          <label>Telefone (opcional)</label>
+          <input type="tel" name="phone" placeholder="(xx) 9xxxx-xxxx" value="${isEditing && person.phone ? E(person.phone) : ''}">
+        </div>
+        <div class="form-error"></div>
+      </form>
+    `;
+
+    window.openModal({
+      title: title,
+      bodyHtml: bodyHtml,
+      confirmLabel: 'Salvar',
+      onConfirm: async (overlay, close) => {
+        const form = overlay.querySelector('#form-person-dynamic');
+        const errorEl = form.querySelector('.form-error');
+        errorEl.textContent = '';
+
+        const data = {
+          school_id: _schoolId,
+          name: form.name.value.trim(),
+          registration: form.registration.value.trim() || null,
+          email: form.email.value.trim() || null,
+          phone: form.phone.value.trim() || null,
+        };
+
+        if (!data.name) {
+          errorEl.textContent = 'O nome é obrigatório.';
+          return;
+        }
+
+        try {
+          const res = isEditing
+            ? await window.aula.updatePerson(person.id, data)
+            : await window.aula.createPerson(data);
+          if (!res.success) throw new Error(res.error);
+          close();
+          loadPeople();
+        } catch (e) {
+          errorEl.textContent = e.message;
+        }
+      }
+    });
   }
 
   function handlePeopleListClick(e) {
@@ -380,14 +323,7 @@ window.UserManagementModule = (() => {
     if (!btn) return;
     const { action, id, name, registration, email, phone } = btn.dataset;
     if (action === 'edit-person') {
-      _editPersonId = parseInt(id);
-      document.getElementById('modal-person-title').textContent = 'Editar Pessoa';
-      const f = document.getElementById('form-person');
-      f.name.value = name;
-      f.registration.value = registration || '';
-      f.email.value = email || '';
-      f.phone.value = phone || '';
-      showModal('modal-person');
+      openPersonModal({ id: parseInt(id), name, registration, email, phone });
     } else if (action === 'manage-roles') {
       openRolesModal(parseInt(id), name);
     }
@@ -395,95 +331,7 @@ window.UserManagementModule = (() => {
 
   // ── Modal de Papéis ─────────────────────────────────────────────────────────
 
-  async function openRolesModal(personId, personName) {
-    _rolesPersonId = personId;
-    document.getElementById('roles-person-name').textContent = personName;
-    showModal('modal-roles');
-    await refreshRolesModal();
-  }
-
-  async function refreshRolesModal() {
-    const container = document.getElementById('roles-content');
-    container.innerHTML = '<div class="loading-spinner">Carregando...</div>';
-    try {
-      const [rolesRes, funcsRes] = await Promise.all([
-        window.aula.getPersonRoles(_rolesPersonId),
-        window.aula.getStaffFunctions(_schoolId),
-      ]);
-      if (!rolesRes.success) throw new Error(rolesRes.error);
-      const { teacher, admin, staff } = rolesRes.data;
-
-      // Atualiza o select de funções disponíveis
-      _cachedFunctions = funcsRes.success ? funcsRes.data.filter(f => f.active) : [];
-      const sel = document.getElementById('new-staff-func-select');
-      const assignedIds = new Set(staff.map(s => s.staff_function_id));
-      sel.innerHTML = '<option value="">Selecione uma função...</option>' +
-        _cachedFunctions
-          .filter(f => !assignedIds.has(f.id))
-          .map(f => `<option value="${f.id}">${f.name} (${CAT_LABELS[f.category]?.label})</option>`)
-          .join('');
-      const noHint = document.getElementById('no-functions-hint');
-      noHint.style.display = _cachedFunctions.length === 0 ? '' : 'none';
-      sel.style.display = _cachedFunctions.length === 0 ? 'none' : '';
-
-      // Exibe/oculta seção de admin
-      document.getElementById('admin-role-section').style.display = admin ? 'none' : '';
-
-      // Monta lista de papéis atuais
-      const WM = { presencial: '🏢 Presencial', remoto: '🌐 Remoto', hibrido: '🔄 Híbrido' };
-      let html = '<div class="roles-list">';
-
-      // Professor
-      html += `<div class="role-row">
-        <span class="role-label">👨‍🏫 Professor</span>
-        ${teacher
-          ? `<span class="badge ${teacher.active ? 'badge-teacher' : 'badge-inactive'}">${teacher.active ? 'Ativo' : 'Inativo'}</span>
-             <span class="meta" style="font-size:11px;color:var(--color-text-muted)" title="Modalidade de ensino">${WM[teacher.work_mode||'presencial']}</span>
-             <button class="btn btn-ghost btn-small" data-action="edit-workmode" data-work-mode="${teacher.work_mode||'presencial'}" title="Alterar modalidade">✏️</button>
-             <button class="btn btn-small ${teacher.active ? 'btn-warning' : 'btn-success'}"
-               data-action="toggle-teacher" data-active="${teacher.active ? 0 : 1}" data-work-mode="${teacher.work_mode||'presencial'}">
-               ${teacher.active ? 'Desativar' : 'Reativar'}
-             </button>`
-          : `<button class="btn btn-small btn-primary" data-action="enable-teacher">Atribuir papel</button>`
-        }
-      </div>`;
-
-      // Admin
-      if (admin) {
-        html += `<div class="role-row">
-          <span class="role-label">👨‍💼 Admin</span>
-          <span class="badge ${admin.active ? 'badge-admin' : 'badge-inactive'}">${admin.active ? 'Ativo' : 'Inativo'}</span>
-          <span class="meta">@${admin.username}</span>
-        </div>`;
-      }
-
-      // Colaborador
-      for (const s of staff) {
-        html += `<div class="role-row">
-          <span class="role-label">🏷️ ${s.function_name}</span>
-          ${catBadge(s.category)}
-          <span class="badge ${s.active ? 'badge-staff' : 'badge-inactive'}">${s.active ? 'Ativo' : 'Inativo'}</span>
-          <button class="btn btn-small ${s.active ? 'btn-warning' : 'btn-success'}"
-            data-action="toggle-staff" data-role-id="${s.id}" data-active="${s.active ? 0 : 1}">
-            ${s.active ? 'Desativar' : 'Reativar'}
-          </button>
-          <button class="btn btn-small btn-danger" data-action="remove-staff" data-role-id="${s.id}">
-            Remover
-          </button>
-        </div>`;
-      }
-      html += '</div>';
-      container.innerHTML = html;
-
-      container.querySelectorAll('[data-action]').forEach(btn => {
-        btn.addEventListener('click', () => handleRoleAction(btn.dataset));
-      });
-    } catch (e) {
-      container.innerHTML = `<p class="error">Erro: ${e.message}</p>`;
-    }
-  }
-
-  async function handleRoleAction({ action, active, roleId, workMode }) {
+  async function handleRoleAction({ action, active, roleId, workMode }, closeCurrentModal) {
     try {
       if (action === 'enable-teacher') {
         window.openModal({
@@ -503,7 +351,9 @@ window.UserManagementModule = (() => {
             const r = await window.aula.setTeacherRole(_rolesPersonId, true, wm);
             if (!r.success) throw new Error(r.error);
             close();
-            await refreshRolesModal();
+            closeCurrentModal();
+            const person = await window.aula.getPerson(_rolesPersonId);
+            if (person.success) openRolesModal(person.data.id, person.data.name);
             loadPeople();
           },
         });
@@ -526,7 +376,9 @@ window.UserManagementModule = (() => {
             const r = await window.aula.setTeacherRole(_rolesPersonId, true, wm);
             if (!r.success) throw new Error(r.error);
             close();
-            await refreshRolesModal();
+            closeCurrentModal();
+            const person = await window.aula.getPerson(_rolesPersonId);
+            if (person.success) openRolesModal(person.data.id, person.data.name);
             loadPeople();
           },
         });
@@ -542,7 +394,10 @@ window.UserManagementModule = (() => {
         const r = await window.aula.removeStaffRole(parseInt(roleId));
         if (!r.success) throw new Error(r.error);
       }
-      await refreshRolesModal();
+      // Recarrega o modal de papéis para refletir a mudança
+      closeCurrentModal();
+      const person = await window.aula.getPerson(_rolesPersonId);
+      if (person.success) openRolesModal(person.data.id, person.data.name);
       loadPeople();
     } catch (e) {
       alert('Erro: ' + e.message);
@@ -550,14 +405,17 @@ window.UserManagementModule = (() => {
   }
 
   async function handleAddStaffRole() {
-    const sel = document.getElementById('new-staff-func-select');
+    const sel = document.querySelector('.roles-modal-container #new-staff-func-select');
     const sfId = parseInt(sel.value);
     if (!sfId) { alert('Selecione uma função.'); return; }
     try {
       const r = await window.aula.addStaffRole(_rolesPersonId, sfId);
       if (!r.success) throw new Error(r.error);
       sel.value = '';
-      await refreshRolesModal();
+      // Recarrega o modal
+      document.querySelector('.modal-overlay.active .modal-close-btn')?.click();
+      const person = await window.aula.getPerson(_rolesPersonId);
+      if (person.success) openRolesModal(person.data.id, person.data.name);
       loadPeople();
     } catch (e) {
       alert('Erro: ' + e.message);
@@ -566,9 +424,10 @@ window.UserManagementModule = (() => {
 
   async function handleAddAdminRole(e) {
     e.preventDefault();
-    const username = document.getElementById('admin-username').value.trim();
-    const password = document.getElementById('admin-password').value;
-    setError('form-add-admin', '');
+    const form = e.target;
+    const username = form.querySelector('#admin-username').value.trim();
+    const password = form.querySelector('#admin-password').value;
+    const errorEl = form.querySelector('.form-error');
     if (!username || !password) {
       setError('form-add-admin', 'Preencha usuário e senha.');
       return;
@@ -578,67 +437,116 @@ window.UserManagementModule = (() => {
         personId: _rolesPersonId, username, password
       });
       if (!r.success) throw new Error(r.error);
-      document.getElementById('admin-username').value = '';
-      document.getElementById('admin-password').value = '';
-      await refreshRolesModal();
+      form.querySelector('#admin-username').value = '';
+      form.querySelector('#admin-password').value = '';
+      document.querySelector('.modal-overlay.active .modal-close-btn')?.click();
+      const person = await window.aula.getPerson(_rolesPersonId);
+      if (person.success) openRolesModal(person.data.id, person.data.name);
       loadPeople();
     } catch (e) {
-      setError('form-add-admin', e.message);
+      if (errorEl) errorEl.textContent = e.message;
+      else alert(e.message);
+    }
+  }
+
+  async function handleSetPortalPassword(e) {
+    e.preventDefault();
+    const password = e.target.querySelector('#portal-password').value;
+    const errorEl = document.getElementById('portal-form-error');
+    errorEl.textContent = '';
+    if (!password || password.length < 6) {
+      errorEl.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+      return;
+    }
+    try {
+      const r = await window.aula.setTeacherPortalPassword({ personId: _rolesPersonId, password });
+      if (!r.success) throw new Error(r.error);
+      e.target.querySelector('#portal-password').value = '';
+      window.showToast?.('Senha do portal definida com sucesso!', 'success') || alert('Senha definida!');
+    } catch (e) {
+      errorEl.textContent = 'Erro: ' + e.message;
     }
   }
 
   // ── Setup de eventos ─────────────────────────────────────────────────────────
 
   function setupEventListeners() {
+    const container = document.querySelector('.gestao-usuarios');
+    if (!container) return;
+
     // Abas internas
-    document.querySelectorAll('.gestao-usuarios .tab-btn[data-tab]').forEach(btn => {
-      btn.addEventListener('click', () => {
+    const tabsSection = container.querySelector('.tabs-section');
+    if (tabsSection) {
+      tabsSection.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tab-btn[data-tab]');
+        if (!btn) return;
+
         const tab = btn.dataset.tab;
-        document.querySelectorAll('.gestao-usuarios .tab-btn[data-tab]').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.gestao-usuarios .tab-content').forEach(c => c.classList.remove('active'));
+        container.querySelectorAll('.tab-btn[data-tab]').forEach(b => b.classList.remove('active'));
+        container.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
-        document.getElementById(`tab-${tab}`).classList.add('active');
+        container.querySelector(`#tab-${tab}`)?.classList.add('active');
       });
-    });
+    }
 
     // Funções
-    document.getElementById('btn-new-func')?.addEventListener('click', () => {
-      _editFuncId = null;
-      document.getElementById('modal-func-title').textContent = 'Nova Função';
-      document.getElementById('form-func').reset();
-      showModal('modal-func');
-    });
-    document.getElementById('btn-cancel-func')?.addEventListener('click', () => hideModal('modal-func'));
-    document.getElementById('form-func')?.addEventListener('submit', handleFuncSubmit);
-    document.getElementById('functions-list')?.addEventListener('click', handleFunctionListClick);
+    container.querySelector('#btn-new-func')?.addEventListener('click', () => openFuncModal(null));
+    container.querySelector('#functions-list')?.addEventListener('click', handleFunctionListClick);
 
     // Pessoas
-    document.getElementById('btn-new-person')?.addEventListener('click', () => {
-      _editPersonId = null;
-      document.getElementById('modal-person-title').textContent = 'Nova Pessoa';
-      document.getElementById('form-person').reset();
-      showModal('modal-person');
-    });
-    document.getElementById('btn-cancel-person')?.addEventListener('click', () => hideModal('modal-person'));
-    document.getElementById('form-person')?.addEventListener('submit', handlePersonSubmit);
-    document.getElementById('people-list')?.addEventListener('click', handlePeopleListClick);
+    container.querySelector('#btn-new-person')?.addEventListener('click', () => openPersonModal(null));
+    container.querySelector('#people-list')?.addEventListener('click', handlePeopleListClick);
 
-    // Papéis
-    document.getElementById('btn-close-roles')?.addEventListener('click', () => hideModal('modal-roles'));
-    document.getElementById('btn-add-staff-role')?.addEventListener('click', handleAddStaffRole);
-    document.getElementById('form-add-admin')?.addEventListener('submit', handleAddAdminRole);
-    document.getElementById('link-go-functions')?.addEventListener('click', e => {
-      e.preventDefault();
-      hideModal('modal-roles');
-      document.querySelector('.gestao-usuarios .tab-btn[data-tab="functions"]')?.click();
+    // Delegação de eventos para o modal de papéis (que é totalmente dinâmico)
+    document.body.addEventListener('click', e => {
+      const rolesContainer = e.target.closest('.roles-modal-container');
+      if (!rolesContainer) return;
+
+      const actionBtn = e.target.closest('button[data-action], a[data-action]');
+      if (actionBtn) {
+        const closeCurrentModal = () => e.target.closest('.modal-overlay')?.querySelector('.modal-close-btn')?.click();
+        if (actionBtn.dataset.action === 'add-staff-role') {
+          handleAddStaffRole();
+        } else if (actionBtn.dataset.action === 'go-functions') {
+          e.preventDefault();
+          closeCurrentModal();
+          container.querySelector('.tab-btn[data-tab="functions"]')?.click();
+        } else {
+          handleRoleAction(actionBtn.dataset, closeCurrentModal);
+        }
+      }
     });
 
-    // Fechar modais por overlay e X
-    document.querySelectorAll('.gestao-usuarios .u-modal-bg').forEach(overlay => {
-      overlay.addEventListener('click', e => e.target.parentElement.classList.add('hidden'));
+    document.body.addEventListener('submit', e => {
+      const rolesContainer = e.target.closest('.roles-modal-container');
+      if (!rolesContainer) return;
+
+      const form = e.target.closest('form[data-action]');
+      if (form) {
+        e.preventDefault();
+        if (form.dataset.action === 'add-admin-role') handleAddAdminRole(e);
+        if (form.dataset.action === 'set-portal-password') handleSetPortalPassword(e);
+      }
     });
-    document.querySelectorAll('.gestao-usuarios .u-modal-close').forEach(btn => {
-      btn.addEventListener('click', e => e.target.closest('.u-modal').classList.add('hidden'));
+
+    document.body.addEventListener('change', async e => {
+      const rolesContainer = e.target.closest('.roles-modal-container');
+      if (!rolesContainer || e.target.dataset.action !== 'change-admin-role') return;
+
+      const sel = e.target;
+      const adminId = parseInt(sel.dataset.adminId);
+      const role = sel.value;
+      try {
+        const r = await window.aula.updateAdminRole(adminId, role);
+        if (!r.success) throw new Error(r.error);
+        window.showToast?.('Papel atualizado!', 'success') || alert('Papel atualizado!');
+      } catch (err) {
+        alert('Erro: ' + err.message);
+        // Recarrega o modal
+        sel.closest('.modal-overlay')?.querySelector('.modal-close-btn')?.click();
+        const person = await window.aula.getPerson(_rolesPersonId);
+        if (person.success) openRolesModal(person.data.id, person.data.name);
+      }
     });
   }
 
@@ -653,4 +561,5 @@ window.UserManagementModule = (() => {
   }
 
   return { init };
+
 })();

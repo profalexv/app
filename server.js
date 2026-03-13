@@ -43,7 +43,20 @@ const PORT = process.env.PORT || 3000;
 
 // ─── Middlewares globais ──────────────────────────────────────────────────────
 // Helmet: cabeçalhos de segurança HTTP (X-Frame-Options, X-Content-Type-Options, etc.)
-app.use(helmet({ contentSecurityPolicy: false }));
+// A política de segurança de conteúdo (CSP) foi desativada. É altamente recomendável
+// ativá-la com uma política restritiva para mitigar ataques XSS.
+// A configuração abaixo é um ponto de partida seguro que permite scripts e estilos
+// inline, o que é necessário para o frontend atual, mas é mais seguro que desativar
+// completamente. O ideal a longo prazo seria remover todos os scripts e estilos inline.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'script-src': ["'self'", "'unsafe-inline'"], // Permite scripts inline (necessário para onclick, etc.)
+      'style-src': ["'self'", "'unsafe-inline'"],  // Permite estilos inline (style="...")
+    },
+  },
+}));
 
 // O webhook do Mercado Pago precisa do body cru (raw) para verificação HMAC.
 // Deve ser registrado ANTES do express.json() global.
@@ -80,6 +93,11 @@ app.use((req, res, next) => {
 app.use('/app', express.static(path.join(__dirname, 'aula-app')));
 app.get('/app', (req, res) => {
   res.sendFile(path.join(__dirname, 'aula-app', 'index.html'));
+});
+
+// ─── Portal do Professor (acesso restrito por senha definida pelo coordenador)
+app.get('/portal', (req, res) => {
+  res.sendFile(path.join(__dirname, 'src', 'renderer', 'portal-professor.html'));
 });
 
 // ─── Rotas da API ─────────────────────────────────────────────────────────────
